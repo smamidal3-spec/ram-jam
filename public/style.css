@@ -329,8 +329,8 @@ body {
 }
 
 #playBtn {
-  width: 70px;
-  height: 70px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: #a855f7;
   color: white;
@@ -348,39 +348,41 @@ body {
 }
 
 #pauseBtn {
-  width: 50px;
-  height: 50px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background: #334155;
+  background: #a855f7;
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
   cursor: pointer;
-  transition: background 0.2s;
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+  transition: transform 0.2s;
 }
 
 #pauseBtn:hover {
-  background: #475569;
+  transform: scale(1.05);
 }
 
 #skipBtn {
-  width: 50px;
-  height: 50px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background: #334155;
+  background: #a855f7;
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
   cursor: pointer;
-  transition: background 0.2s;
+  box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+  transition: transform 0.2s;
 }
 
 #skipBtn:hover {
-  background: #475569;
+  transform: scale(1.05);
 }
 
 /* Right Panel Elements */

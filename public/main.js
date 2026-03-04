@@ -550,6 +550,7 @@ function renderSearchResults(results) {
 
             socket.emit('ADD_TO_QUEUE', { sessionId, videoItem });
             searchInput.value = '';
+            searchResults.innerHTML = '';
             searchResults.classList.add('hidden');
 
             // Auto-play: if nothing is playing, tell server to start the next song.
