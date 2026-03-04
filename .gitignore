@@ -1,0 +1,5 @@
+node_modules/
+*.log
+cf_*.log
+cloudflare*.log
+.env

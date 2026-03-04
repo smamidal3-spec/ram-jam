@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ram Jam</title>
+    <link rel="stylesheet" href="/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+
+    <div class="background-animation"></div>
+
+    <div class="app-container">
+
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">🎧</span>
+                <h1 class="logo-text"><span>Ram</span><span>Jam</span></h1>
+            </div>
+            <div class="session-info">
+                <div class="badge role-badge" id="roleBadge">Joining...</div>
+                <div class="badge users-badge"><span id="userCount">0</span>/2 Users</div>
+                <button id="copyLinkBtn" class="btn btn-secondary copy-btn">Copy<br>Invite<br>Link</button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- Left Panel: Player & Controls -->
+            <section class="player-section glass-panel">
+
+                <div class="video-container" id="playerWrapper">
+                    <div id="player" class="hidden-player"></div>
+
+                    <!-- Album Art Cover -->
+                    <div id="albumArtContainer" class="album-art-container">
+                        <div class="vinyl-record" id="vinylRecord">
+                            <img id="albumArtImage"
+                                src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500&auto=format&fit=crop"
+                                alt="Album Art">
+                        </div>
+                        <div class="current-track-info">
+                            <h2 id="currentTrackTitle">Ready to Jam</h2>
+                        </div>
+                        <hr class="separator">
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <div class="progress-bar-container">
+                        <input type="range" id="seekBar" class="seek-bar" value="0" min="0" max="100" step="0.1">
+                        <div class="time-display">
+                            <span id="currentTimeDisplay">0:00</span> / <span id="durationDisplay">0:00</span>
+                        </div>
+                    </div>
+
+                    <div class="playback-buttons">
+                        <button id="playBtn" class="btn btn-primary control-btn" title="Play">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                            </svg>
+                        </button>
+                        <button id="pauseBtn" class="btn btn-secondary control-btn" title="Pause">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="6" y="4" width="4" height="16"></rect>
+                                <rect x="14" y="4" width="4" height="16"></rect>
+                            </svg>
+                        </button>
+                        <button id="skipBtn" class="btn btn-secondary control-btn" title="Skip">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                                <line x1="19" y1="5" x2="19" y2="19"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Right Panel: Queue & Adding -->
+            <section class="queue-section glass-panel">
+
+                <div class="search-container">
+                    <h3>Search Song</h3>
+                    <div class="search-wrapper">
+                        <div class="input-group">
+                            <input type="text" id="searchInput" placeholder="Search for a song...">
+                        </div>
+                        <div id="searchResults" class="search-results hidden">
+                            <!-- Search results injected here -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="queue-list-container">
+                    <h3>Up Next</h3>
+                    <ul id="queueList" class="queue-list">
+                        <li class="empty-queue">Queue is empty</li>
+                    </ul>
+                </div>
+
+                <div class="chat-container">
+                    <h3>Chat 💬</h3>
+                    <div id="chatMessages" class="chat-messages"></div>
+                    <div class="chat-input-wrapper">
+                        <input type="text" id="chatInput" placeholder="Type a message..." maxlength="200">
+                        <button id="chatSendBtn" class="btn btn-primary chat-send-btn">➤</button>
+                    </div>
+                </div>
+
+            </section>
+
+        </main>
+
+        <!-- Modals & Overlays -->
+        <div id="joinOverlay" class="overlay">
+            <div class="modal glass-panel">
+                <h2>Welcome to Ram Jam</h2>
+                <p>Join the session to activate audio</p>
+                <input type="text" id="joinNameInput" placeholder="Enter your name"
+                    style="margin: 20px 0; width: 100%; padding: 10px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); color: white;">
+                <button id="joinBtn" class="btn btn-primary" style="width: 100%">Join Session</button>
+            </div>
+        </div>
+
+        <div id="overlay" class="overlay hidden">
+            <div class="modal glass-panel">
+                <h2 id="modalTitle">Session Status</h2>
+                <p id="modalMessage">Loading...</p>
+                <button id="modalActionBtn" class="btn btn-primary hidden" style="width: 100%; margin-top: 16px;">Resume
+                    Audio</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Load YouTube Iframe API asynchronously -->
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="/main.js"></script>
+</body>
+
+</html>
