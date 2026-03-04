@@ -9,9 +9,10 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: { origin: '*' },
-    transports: ['websocket'],
-    pingInterval: 10000,
-    pingTimeout: 5000
+    transports: ['polling', 'websocket'],
+    allowUpgrades: true,
+    pingInterval: 25000,
+    pingTimeout: 20000
 });
 
 // Serve frontend static files without cache to force reload HTML/JS/CSS updates

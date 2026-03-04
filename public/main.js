@@ -57,13 +57,13 @@ const chatInput = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSendBtn');
 
 socket = io({
-    transports: ['websocket'],
-    upgrade: false,
+    transports: ['polling', 'websocket'],
+    upgrade: true,
     reconnection: true,
     reconnectionAttempts: Infinity,
-    reconnectionDelay: 500,
-    reconnectionDelayMax: 2000,
-    timeout: 10000
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 5000,
+    timeout: 20000
 });
 
 function suppressStateEvents(ms = 1200) {
@@ -346,7 +346,12 @@ seekBar.addEventListener('change', (e) => {
 });
 
 socket.on('connect', () => {
-    if (hasJoined) hideModal();
+    if (hasJoined) {
+        // Auto-rejoin after reconnect so the user never gets stuck on 'Connection Lost'
+        const userName = localStorage.getItem('ramjam_username') || 'Anon';
+        socket.emit('JOIN_SESSION', { sessionId, userName });
+        hideModal();
+    }
 });
 
 socket.on('disconnect', () => {
@@ -547,10 +552,12 @@ function renderSearchResults(results) {
             searchInput.value = '';
             searchResults.classList.add('hidden');
 
-            if (isHost && !currentVideoId) {
+            // Auto-play: if nothing is playing, tell server to start the next song.
+            // Small delay to let the queue update arrive first.
+            if (!currentVideoId) {
                 setTimeout(() => {
                     socket.emit('PLAY_NEXT', { sessionId });
-                }, 300);
+                }, 500);
             }
         });
 
