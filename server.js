@@ -250,6 +250,31 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('REMOVE_FROM_QUEUE', (data) => {
+        const sessionId = normalizeSessionId(data?.sessionId);
+        if (!sessionId) return;
+        const room = getJoinedRoom(sessionId, socket.id);
+        if (!room) return;
+        const index = data.index;
+        if (typeof index !== 'number' || index < 0 || index >= room.queue.length) return;
+        room.queue.splice(index, 1);
+        io.to(sessionId).emit('QUEUE_UPDATE', room.queue);
+    });
+
+    socket.on('REORDER_QUEUE', (data) => {
+        const sessionId = normalizeSessionId(data?.sessionId);
+        if (!sessionId) return;
+        const room = getJoinedRoom(sessionId, socket.id);
+        if (!room) return;
+        const { fromIndex, toIndex } = data;
+        if (typeof fromIndex !== 'number' || typeof toIndex !== 'number') return;
+        if (fromIndex < 0 || fromIndex >= room.queue.length) return;
+        if (toIndex < 0 || toIndex >= room.queue.length) return;
+        const [item] = room.queue.splice(fromIndex, 1);
+        room.queue.splice(toIndex, 0, item);
+        io.to(sessionId).emit('QUEUE_UPDATE', room.queue);
+    });
+
     socket.on('CHAT_MESSAGE', (data) => {
         const sessionId = normalizeSessionId(data?.sessionId);
         if (!sessionId) return;

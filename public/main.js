@@ -121,18 +121,27 @@ function schedulePlaybackHealthCheck(expectedTime) {
         if (isHost || !isPlayerReady || !currentVideoId) return;
         if (player.getPlayerState() === YT.PlayerState.PLAYING) return;
 
-        pendingResumeTime = expectedTime;
-        pendingResumeState = 'PLAY';
-        showModal(
-            'Audio Blocked',
-            'Desktop browser blocked autoplay. Click Resume Audio to continue sync.',
-            'Resume Audio',
-            () => {
-                hideModal();
-                forceListenerPlayback(pendingResumeTime, pendingResumeState);
-            }
-        );
-    }, 1800);
+        // Try auto-resuming first before showing the modal
+        suppressStateEvents(1500);
+        player.loadVideoById(currentVideoId, expectedTime || 0);
+        player.playVideo();
+
+        // If still not playing after 2s, show the manual resume button
+        setTimeout(() => {
+            if (player.getPlayerState() === YT.PlayerState.PLAYING) return;
+            pendingResumeTime = expectedTime;
+            pendingResumeState = 'PLAY';
+            showModal(
+                'Tap to Play',
+                'Your browser blocked autoplay. Tap below to start audio.',
+                'Resume Audio',
+                () => {
+                    hideModal();
+                    forceListenerPlayback(pendingResumeTime, pendingResumeState);
+                }
+            );
+        }, 2000);
+    }, 3000);
 }
 
 function forceListenerPlayback(targetTime, state) {
@@ -144,13 +153,13 @@ function forceListenerPlayback(targetTime, state) {
     if (state === 'PAUSE') {
         player.cueVideoById(currentVideoId, time);
         player.pauseVideo();
-        vinylRecord.style.animationPlayState = 'paused';
+
         return;
     }
 
     player.loadVideoById(currentVideoId, time);
     player.playVideo();
-    vinylRecord.style.animationPlayState = 'running';
+
     schedulePlaybackHealthCheck(time);
 }
 
@@ -261,13 +270,13 @@ function onPlayerStateChange(event) {
     if (isStateEventSuppressed()) return;
 
     if (event.data === YT.PlayerState.PLAYING) {
-        vinylRecord.style.animationPlayState = 'running';
+
         emitControlEvent('PLAY');
         return;
     }
 
     if (event.data === YT.PlayerState.PAUSED) {
-        vinylRecord.style.animationPlayState = 'paused';
+
         emitControlEvent('PAUSE');
         return;
     }
@@ -608,15 +617,42 @@ function renderQueue(queue) {
         return;
     }
 
-    queue.forEach((item) => {
+    queue.forEach((item, index) => {
         const li = document.createElement('li');
         li.className = 'queue-item';
+        li.draggable = true;
+        li.dataset.index = index;
         li.innerHTML = `
+            <span class="drag-handle">☰</span>
             <img src="${item.thumbnail}" alt="thumbnail">
             <div class="queue-item-details">
                 <span class="queue-item-title">${item.title}</span>
             </div>
+            <button class="queue-delete-btn" title="Remove">✕</button>
         `;
+
+        // Delete button
+        li.querySelector('.queue-delete-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            socket.emit('REMOVE_FROM_QUEUE', { sessionId, index });
+        });
+
+        // Drag-and-drop reorder
+        li.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', index);
+            li.classList.add('dragging');
+        });
+        li.addEventListener('dragend', () => li.classList.remove('dragging'));
+        li.addEventListener('dragover', (e) => e.preventDefault());
+        li.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+            const toIndex = parseInt(li.dataset.index);
+            if (fromIndex !== toIndex) {
+                socket.emit('REORDER_QUEUE', { sessionId, fromIndex, toIndex });
+            }
+        });
+
         queueList.appendChild(li);
     });
 }
