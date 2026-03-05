@@ -26,6 +26,63 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 app.use(express.json());
 
+// ─── Spotify API (Client Credentials) ─────────────────────
+const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
+const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
+let spotifyToken = null;
+let spotifyTokenExpiry = 0;
+
+async function getSpotifyToken() {
+    if (spotifyToken && Date.now() < spotifyTokenExpiry) return spotifyToken;
+    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) return null;
+    try {
+        const resp = await fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64')
+            },
+            body: 'grant_type=client_credentials'
+        });
+        const data = await resp.json();
+        if (data.access_token) {
+            spotifyToken = data.access_token;
+            spotifyTokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+            return spotifyToken;
+        }
+    } catch (e) { console.error('Spotify auth error:', e); }
+    return null;
+}
+
+async function spotifySearch(query, limit = 5) {
+    const token = await getSpotifyToken();
+    if (!token) return null;
+    try {
+        const resp = await fetch(
+            `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`,
+            { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+        const data = await resp.json();
+        return (data.tracks?.items || []).map(t => ({
+            spotifyId: t.id,
+            title: `${t.artists.map(a => a.name).join(', ')} - ${t.name}`,
+            artist: t.artists.map(a => a.name).join(', '),
+            trackName: t.name,
+            thumbnail: t.album?.images?.[0]?.url || '',
+            duration: Math.round(t.duration_ms / 1000),
+            album: t.album?.name || ''
+        }));
+    } catch (e) { console.error('Spotify search error:', e); }
+    return null;
+}
+
+async function resolveYouTubeId(artist, track) {
+    try {
+        const r = await ytSearch(`${artist} ${track} official audio`);
+        return r.videos.length > 0 ? r.videos[0].videoId : null;
+    } catch (e) { return null; }
+}
+
 // In-memory Room State
 const rooms = {};
 
@@ -74,24 +131,54 @@ app.get('/session/:id', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 3. Search API
+// 3. Search API — Spotify first, fallback to YouTube
 app.get('/api/search', async (req, res) => {
     const query = req.query.q;
     if (!query) return res.status(400).json({ error: 'Query required' });
 
     try {
+        // Try Spotify first
+        const spotifyResults = await spotifySearch(query);
+        if (spotifyResults && spotifyResults.length > 0) {
+            return res.json(spotifyResults.map(t => ({
+                title: t.title,
+                author: t.artist,
+                thumbnail: t.thumbnail,
+                duration: t.duration,
+                album: t.album,
+                spotifyId: t.spotifyId,
+                trackName: t.trackName,
+                artist: t.artist,
+                source: 'spotify'
+            })));
+        }
+
+        // Fallback to yt-search
         const r = await ytSearch(query);
-        // Return top 5 video results
         const videos = r.videos.slice(0, 5).map(v => ({
             videoId: v.videoId,
             title: v.title,
             thumbnail: v.thumbnail,
-            author: v.author.name
+            author: v.author.name,
+            source: 'youtube'
         }));
         res.json(videos);
     } catch (err) {
         console.error('Search error:', err);
         res.status(500).json({ error: 'Search failed' });
+    }
+});
+
+// 4. Resolve YouTube video ID from Spotify track
+app.get('/api/resolve-yt', async (req, res) => {
+    const { artist, track } = req.query;
+    if (!artist || !track) return res.status(400).json({ error: 'artist and track required' });
+    try {
+        const videoId = await resolveYouTubeId(artist, track);
+        if (videoId) return res.json({ videoId });
+        res.status(404).json({ error: 'No YouTube match found' });
+    } catch (err) {
+        res.status(500).json({ error: 'Resolve failed' });
     }
 });
 

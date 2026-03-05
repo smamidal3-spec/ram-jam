@@ -541,29 +541,47 @@ function renderSearchResults(results) {
     results.forEach((video) => {
         const div = document.createElement('div');
         div.className = 'search-result-item';
+        const durationStr = video.duration ? `${Math.floor(video.duration / 60)}:${String(video.duration % 60).padStart(2, '0')}` : '';
+        const sourceIcon = video.source === 'spotify' ? '🟢' : '▶️';
         div.innerHTML = `
             <img src="${video.thumbnail}" alt="thumb">
             <div class="search-result-info">
-                <span class="search-result-title">${video.title}</span>
-                <span class="search-result-author">${video.author}</span>
+                <span class="search-result-title">${sourceIcon} ${video.title}</span>
+                <span class="search-result-author">${video.author}${video.album ? ' · ' + video.album : ''}${durationStr ? ' · ' + durationStr : ''}</span>
             </div>
         `;
 
-        div.addEventListener('click', () => {
+        div.addEventListener('click', async () => {
+            searchInput.value = '';
+            searchResults.innerHTML = '';
+            searchResults.classList.add('hidden');
+
+            let videoId = video.videoId;
+
+            // Spotify results need YouTube video resolution
+            if (video.source === 'spotify' && !videoId) {
+                try {
+                    const resp = await fetch(`/api/resolve-yt?artist=${encodeURIComponent(video.artist)}&track=${encodeURIComponent(video.trackName)}`);
+                    const data = await resp.json();
+                    videoId = data.videoId;
+                } catch (e) {
+                    console.error('Failed to resolve YouTube video:', e);
+                    return;
+                }
+            }
+
+            if (!videoId) return;
+
             const videoItem = {
                 id: Date.now().toString(),
-                videoId: video.videoId,
+                videoId,
                 title: video.title,
                 thumbnail: video.thumbnail
             };
 
             socket.emit('ADD_TO_QUEUE', { sessionId, videoItem });
-            searchInput.value = '';
-            searchResults.innerHTML = '';
-            searchResults.classList.add('hidden');
 
             // Auto-play: if nothing is playing, tell server to start the next song.
-            // Small delay to let the queue update arrive first.
             if (!currentVideoId) {
                 setTimeout(() => {
                     socket.emit('PLAY_NEXT', { sessionId });
