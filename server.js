@@ -76,10 +76,17 @@ async function spotifySearch(query, limit = 5) {
     return null;
 }
 
+// YouTube resolve cache — same song never resolved twice
+const ytCache = new Map();
+
 async function resolveYouTubeId(artist, track) {
+    const key = `${artist}||${track}`.toLowerCase();
+    if (ytCache.has(key)) return ytCache.get(key);
     try {
         const r = await ytSearch(`${artist} ${track} official audio`);
-        return r.videos.length > 0 ? r.videos[0].videoId : null;
+        const videoId = r.videos.length > 0 ? r.videos[0].videoId : null;
+        if (videoId) ytCache.set(key, videoId);
+        return videoId;
     } catch (e) { return null; }
 }
 
@@ -137,27 +144,19 @@ app.get('/api/search', async (req, res) => {
     if (!query) return res.status(400).json({ error: 'Query required' });
 
     try {
-        // Try Spotify — pre-resolve YouTube IDs in parallel for instant click
+        // Try Spotify — fast, returns instantly
         const spotifyResults = await spotifySearch(query);
         if (spotifyResults && spotifyResults.length > 0) {
-            const resolved = await Promise.allSettled(
-                spotifyResults.map(async (t) => {
-                    const videoId = await resolveYouTubeId(t.artist, t.trackName);
-                    return {
-                        videoId: videoId || null,
-                        title: t.title,
-                        author: t.artist,
-                        thumbnail: t.thumbnail,
-                        duration: t.duration,
-                        album: t.album,
-                        source: 'spotify'
-                    };
-                })
-            );
-            const results = resolved
-                .filter(r => r.status === 'fulfilled' && r.value.videoId)
-                .map(r => r.value);
-            if (results.length > 0) return res.json(results);
+            return res.json(spotifyResults.map(t => ({
+                title: t.title,
+                author: t.artist,
+                thumbnail: t.thumbnail,
+                duration: t.duration,
+                album: t.album,
+                trackName: t.trackName,
+                artist: t.artist,
+                source: 'spotify'
+            })));
         }
 
         // Fallback to yt-search

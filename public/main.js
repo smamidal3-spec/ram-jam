@@ -551,16 +551,30 @@ function renderSearchResults(results) {
             </div>
         `;
 
-        div.addEventListener('click', () => {
+        div.addEventListener('click', async () => {
             searchInput.value = '';
             searchResults.innerHTML = '';
             searchResults.classList.add('hidden');
 
-            if (!video.videoId) return;
+            let videoId = video.videoId;
+
+            // Spotify results: resolve YouTube ID on click (cached server-side)
+            if (video.source === 'spotify' && !videoId) {
+                try {
+                    const resp = await fetch(`/api/resolve-yt?artist=${encodeURIComponent(video.artist)}&track=${encodeURIComponent(video.trackName)}`);
+                    const data = await resp.json();
+                    videoId = data.videoId;
+                } catch (e) {
+                    console.error('Failed to resolve YouTube video:', e);
+                    return;
+                }
+            }
+
+            if (!videoId) return;
 
             const videoItem = {
                 id: Date.now().toString(),
-                videoId: video.videoId,
+                videoId,
                 title: video.title,
                 thumbnail: video.thumbnail
             };
