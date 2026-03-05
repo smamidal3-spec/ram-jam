@@ -551,30 +551,16 @@ function renderSearchResults(results) {
             </div>
         `;
 
-        div.addEventListener('click', async () => {
+        div.addEventListener('click', () => {
             searchInput.value = '';
             searchResults.innerHTML = '';
             searchResults.classList.add('hidden');
 
-            let videoId = video.videoId;
-
-            // Spotify results need YouTube video resolution
-            if (video.source === 'spotify' && !videoId) {
-                try {
-                    const resp = await fetch(`/api/resolve-yt?artist=${encodeURIComponent(video.artist)}&track=${encodeURIComponent(video.trackName)}`);
-                    const data = await resp.json();
-                    videoId = data.videoId;
-                } catch (e) {
-                    console.error('Failed to resolve YouTube video:', e);
-                    return;
-                }
-            }
-
-            if (!videoId) return;
+            if (!video.videoId) return;
 
             const videoItem = {
                 id: Date.now().toString(),
-                videoId,
+                videoId: video.videoId,
                 title: video.title,
                 thumbnail: video.thumbnail
             };

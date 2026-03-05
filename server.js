@@ -137,20 +137,27 @@ app.get('/api/search', async (req, res) => {
     if (!query) return res.status(400).json({ error: 'Query required' });
 
     try {
-        // Try Spotify first
+        // Try Spotify — pre-resolve YouTube IDs in parallel for instant click
         const spotifyResults = await spotifySearch(query);
         if (spotifyResults && spotifyResults.length > 0) {
-            return res.json(spotifyResults.map(t => ({
-                title: t.title,
-                author: t.artist,
-                thumbnail: t.thumbnail,
-                duration: t.duration,
-                album: t.album,
-                spotifyId: t.spotifyId,
-                trackName: t.trackName,
-                artist: t.artist,
-                source: 'spotify'
-            })));
+            const resolved = await Promise.allSettled(
+                spotifyResults.map(async (t) => {
+                    const videoId = await resolveYouTubeId(t.artist, t.trackName);
+                    return {
+                        videoId: videoId || null,
+                        title: t.title,
+                        author: t.artist,
+                        thumbnail: t.thumbnail,
+                        duration: t.duration,
+                        album: t.album,
+                        source: 'spotify'
+                    };
+                })
+            );
+            const results = resolved
+                .filter(r => r.status === 'fulfilled' && r.value.videoId)
+                .map(r => r.value);
+            if (results.length > 0) return res.json(results);
         }
 
         // Fallback to yt-search
