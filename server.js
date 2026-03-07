@@ -439,7 +439,7 @@ io.on('connection', (socket) => {
         }
 
         const room = getJoinedRoom(sessionId, socket.id);
-        if (!room || socket.id !== room.hostSocketId || !ALLOWED_CONTROL_TYPES.has(data?.type)) {
+        if (!room || !ALLOWED_CONTROL_TYPES.has(data?.type)) {
             return;
         }
 
@@ -552,7 +552,7 @@ io.on('connection', (socket) => {
         }
 
         const room = getJoinedRoom(sessionId, socket.id);
-        if (!room || socket.id !== room.hostSocketId) {
+        if (!room) {
             return;
         }
 
@@ -566,7 +566,7 @@ io.on('connection', (socket) => {
         }
 
         const room = getJoinedRoom(sessionId, socket.id);
-        if (!room || socket.id !== room.hostSocketId) {
+        if (!room) {
             return;
         }
 
@@ -586,7 +586,7 @@ io.on('connection', (socket) => {
         }
 
         const room = getJoinedRoom(sessionId, socket.id);
-        if (!room || socket.id !== room.hostSocketId) {
+        if (!room) {
             return;
         }
 

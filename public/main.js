@@ -410,28 +410,28 @@ joinBtn.addEventListener('click', () => {
 });
 
 playBtn.addEventListener('click', () => {
-    if (!isHost || !isPlayerReady || !currentVideoId) {
+    if (!isPlayerReady || !currentVideoId) {
         return;
     }
     player.playVideo();
 });
 
 pauseBtn.addEventListener('click', () => {
-    if (!isHost || !isPlayerReady || !currentVideoId) {
+    if (!isPlayerReady || !currentVideoId) {
         return;
     }
     player.pauseVideo();
 });
 
 skipBtn.addEventListener('click', () => {
-    if (!isHost || !isPlayerReady || !currentVideoId) {
+    if (!isPlayerReady || !currentVideoId) {
         return;
     }
     socket.emit('PLAY_NEXT', { sessionId });
 });
 
 seekBar.addEventListener('change', (event) => {
-    if (!isHost || !isPlayerReady || !currentVideoId) {
+    if (!isPlayerReady || !currentVideoId) {
         return;
     }
 
@@ -1002,19 +1002,17 @@ function updateMediaSession(title, artwork) {
         });
 
         navigator.mediaSession.setActionHandler('play', () => {
-            if (isHost && currentVideoId) {
+            if (currentVideoId) {
                 player.playVideo();
             }
         });
         navigator.mediaSession.setActionHandler('pause', () => {
-            if (isHost && currentVideoId) {
+            if (currentVideoId) {
                 player.pauseVideo();
             }
         });
         navigator.mediaSession.setActionHandler('nexttrack', () => {
-            if (isHost) {
-                socket.emit('PLAY_NEXT', { sessionId });
-            }
+            socket.emit('PLAY_NEXT', { sessionId });
         });
     } catch {
         // no-op
