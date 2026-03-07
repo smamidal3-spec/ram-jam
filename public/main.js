@@ -686,10 +686,9 @@ function renderQueue(queue) {
 
 copyLinkBtn.addEventListener('click', () => {
     navigator.clipboard.writeText(window.location.href);
-    const origText = copyLinkBtn.innerText;
-    copyLinkBtn.innerText = 'Copied!';
+    copyLinkBtn.style.color = '#6ee7b7';
     setTimeout(() => {
-        copyLinkBtn.innerText = origText;
+        copyLinkBtn.style.color = '';
     }, 1500);
 });
 
@@ -712,13 +711,16 @@ chatInput.addEventListener('keypress', (e) => {
 
 socket.on('CHAT_MESSAGE', (data) => {
     const div = document.createElement('div');
-    div.className = 'chat-msg';
     const isMe = data.userId === socket.id;
+    div.className = `chat-msg${isMe ? ' self' : ''}`;
     const name = document.createElement('span');
-    name.className = `chat-user ${isMe ? 'chat-me' : ''}`;
-    name.textContent = data.userName + ': ';
+    name.className = 'chat-sender';
+    name.textContent = data.userName;
+    const text = document.createElement('span');
+    text.className = 'chat-text';
+    text.textContent = data.message;
     div.appendChild(name);
-    div.appendChild(document.createTextNode(data.message));
+    div.appendChild(text);
     chatMessages.appendChild(div);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 });
@@ -729,8 +731,8 @@ function updateMediaSession(title, artwork) {
     if (!('mediaSession' in navigator)) return;
     try {
         navigator.mediaSession.metadata = new MediaMetadata({
-            title: title || 'Ram Jam',
-            artist: 'Ram Jam Session',
+            title: title || "Ram's Jam",
+            artist: "Ram's Jam Session",
             artwork: artwork ? [{ src: artwork, sizes: '512x512', type: 'image/jpeg' }] : []
         });
         navigator.mediaSession.setActionHandler('play', () => { player.playVideo(); });
