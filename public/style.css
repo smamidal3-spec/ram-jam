@@ -434,7 +434,7 @@ body {
   border-radius: 8px;
   max-height: 280px;
   overflow-y: auto;
-  z-index: 100;
+  z-index: 1000;
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);

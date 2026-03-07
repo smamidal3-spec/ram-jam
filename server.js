@@ -374,7 +374,8 @@ app.get('/api/resolve-yt', async (req, res) => {
             return;
         }
         res.json({ videoId });
-    } catch {
+    } catch (error) {
+        console.error('Resolve YouTube ID failed:', error);
         res.status(500).json({ error: 'Resolve failed' });
     }
 });
