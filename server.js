@@ -1,6 +1,7 @@
 const path = require('path');
 const { Server } = require('socket.io');
 const crypto = require('crypto');
+const ytSearch = require('yt-search');
 
 // Split the environment variable by commas to support multiple keys
 const YOUTUBE_API_KEYS = (process.env.YOUTUBE_API_KEY || '')
@@ -246,9 +247,10 @@ function removeSocketFromRoom(socket, sessionId) {
 }
 
 async function youtubeSearch(query, maxResults = 1) {
+    // FALLBACK 1: If no API keys are provided, scrape immediately.
     if (YOUTUBE_API_KEYS.length === 0) {
-        console.error('No YouTube API Keys configured.');
-        return [];
+        console.log('No YouTube API Keys configured. Using yt-search fallback.');
+        return await executeYtSearch(query, maxResults);
     }
 
     const startIdx = currentYtKeyIndex;
@@ -277,21 +279,38 @@ async function youtubeSearch(query, maxResults = 1) {
                 console.warn(`YouTube API Key at index ${currentYtKeyIndex} exhausted quota. Switching to next key.`);
                 currentYtKeyIndex = (currentYtKeyIndex + 1) % YOUTUBE_API_KEYS.length;
 
-                // If we've looped through all keys and none work, give up
+                // If we've looped through all keys and none work, FALLBACK
                 if (currentYtKeyIndex === startIdx) {
-                    console.error('All configured YouTube API Keys have exceeded their daily quota.');
-                    return [];
+                    console.warn('All configured YouTube API Keys have exceeded their daily quota. Falling back to yt-search.');
+                    return await executeYtSearch(query, maxResults);
                 }
                 // Loop continues to retry with the new key...
             } else {
-                // Some other API error occurred, don't retry, just return empty
-                console.error(`YouTube API Error: ${resp.status}`, data);
-                return [];
+                // Some other API error occurred, FALLBACK
+                console.warn(`YouTube API Error: ${resp.status}. Falling back to yt-search.`, data);
+                return await executeYtSearch(query, maxResults);
             }
         } catch (err) {
-            console.error('YouTube API Fetch failed:', err);
-            return [];
+            console.warn('YouTube API Fetch failed. Falling back to yt-search.', err);
+            return await executeYtSearch(query, maxResults);
         }
+    }
+}
+
+// Helper to handle the yt-search scraping logic
+async function executeYtSearch(query, maxResults) {
+    try {
+        const results = await ytSearch(query);
+        const videos = results.videos.slice(0, maxResults);
+        return videos.map(item => ({
+            videoId: item.videoId,
+            title: item.title,
+            thumbnail: item.thumbnail,
+            author: item.author?.name || 'Unknown'
+        }));
+    } catch (err) {
+        console.error('yt-search failed:', err);
+        return [];
     }
 }
 
