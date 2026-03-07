@@ -49,7 +49,6 @@ const joinBtn = document.getElementById('joinBtn');
 const modalTitle = document.getElementById('modalTitle');
 const modalMessage = document.getElementById('modalMessage');
 const modalActionBtn = document.getElementById('modalActionBtn');
-const vinylRecord = document.getElementById('vinylRecord');
 const albumArtImage = document.getElementById('albumArtImage');
 const currentTrackTitle = document.getElementById('currentTrackTitle');
 const chatMessages = document.getElementById('chatMessages');
@@ -545,7 +544,6 @@ socket.on('SESSION_ENDED', () => {
     if (player && isPlayerReady) {
         player.pauseVideo();
     }
-    vinylRecord.style.animationPlayState = 'paused';
     setPlaybackControlsEnabled(false);
     joinOverlay.classList.remove('hidden');
 
@@ -577,7 +575,7 @@ socket.on('CONTROL_EVENT', (data) => {
         suppressStateEvents(1500);
         player.loadVideoById(currentVideoId, 0);
         player.playVideo();
-        vinylRecord.style.animationPlayState = 'running';
+        updateMediaSession(currentTrackMeta?.title, currentTrackMeta?.thumbnail);
 
         if (!isHost) {
             schedulePlaybackHealthCheck(0);
@@ -593,7 +591,7 @@ socket.on('CONTROL_EVENT', (data) => {
         suppressStateEvents(1200);
         player.seekTo(expectedTime, true);
         player.playVideo();
-        vinylRecord.style.animationPlayState = 'running';
+        updateMediaSession(currentTrackMeta?.title, currentTrackMeta?.thumbnail);
         schedulePlaybackHealthCheck(expectedTime);
         return;
     }
@@ -602,7 +600,6 @@ socket.on('CONTROL_EVENT', (data) => {
         suppressStateEvents(900);
         player.pauseVideo();
         player.seekTo(expectedTime, true);
-        vinylRecord.style.animationPlayState = 'paused';
         return;
     }
 
