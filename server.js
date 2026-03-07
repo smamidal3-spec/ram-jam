@@ -1,9 +1,14 @@
-const express = require('express');
-const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io');
 const crypto = require('crypto');
-const ytSearch = require('yt-search');
+
+// Split the environment variable by commas to support multiple keys
+const YOUTUBE_API_KEYS = (process.env.YOUTUBE_API_KEY || '')
+    .split(',')
+    .map(key => key.trim())
+    .filter(Boolean);
+
+let currentYtKeyIndex = 0;
 
 const app = express();
 const server = http.createServer(app);
@@ -241,18 +246,52 @@ function removeSocketFromRoom(socket, sessionId) {
 }
 
 async function youtubeSearch(query, maxResults = 1) {
-    try {
-        const results = await ytSearch(query);
-        const videos = results.videos.slice(0, maxResults);
-        return videos.map(item => ({
-            videoId: item.videoId,
-            title: item.title,
-            thumbnail: item.thumbnail,
-            author: item.author?.name || 'Unknown'
-        }));
-    } catch (err) {
-        console.error('yt-search failed:', err);
+    if (YOUTUBE_API_KEYS.length === 0) {
+        console.error('No YouTube API Keys configured.');
         return [];
+    }
+
+    const startIdx = currentYtKeyIndex;
+
+    // Loop through keys if we hit quota limits
+    while (true) {
+        const apiKey = YOUTUBE_API_KEYS[currentYtKeyIndex];
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${apiKey}`;
+
+        try {
+            const resp = await fetch(url);
+            const data = await resp.json();
+
+            // If success, return the items
+            if (resp.ok) {
+                return (data.items || []).map(item => ({
+                    videoId: item.id?.videoId,
+                    title: item.snippet?.title || '',
+                    thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || '',
+                    author: item.snippet?.channelTitle || 'Unknown'
+                }));
+            }
+
+            // If we hit a quota error (403), try the next key
+            if (resp.status === 403 && data.error?.errors?.[0]?.reason === 'quotaExceeded') {
+                console.warn(`YouTube API Key at index ${currentYtKeyIndex} exhausted quota. Switching to next key.`);
+                currentYtKeyIndex = (currentYtKeyIndex + 1) % YOUTUBE_API_KEYS.length;
+
+                // If we've looped through all keys and none work, give up
+                if (currentYtKeyIndex === startIdx) {
+                    console.error('All configured YouTube API Keys have exceeded their daily quota.');
+                    return [];
+                }
+                // Loop continues to retry with the new key...
+            } else {
+                // Some other API error occurred, don't retry, just return empty
+                console.error(`YouTube API Error: ${resp.status}`, data);
+                return [];
+            }
+        } catch (err) {
+            console.error('YouTube API Fetch failed:', err);
+            return [];
+        }
     }
 }
 
