@@ -253,7 +253,7 @@ function applySyncSnapshot(data) {
 }
 
 function emitControlEvent(type, overrides = {}) {
-    if (!isHost || !isPlayerReady || !currentVideoId) {
+    if (!isPlayerReady || !currentVideoId) {
         return;
     }
 
@@ -385,7 +385,7 @@ function onPlayerReady() {
 }
 
 function onPlayerStateChange(event) {
-    if (!isHost || isStateEventSuppressed()) {
+    if (isStateEventSuppressed()) {
         return;
     }
 
@@ -473,7 +473,7 @@ socket.on('JOIN_SUCCESS', (data) => {
     roleBadge.innerText = isHost ? 'HOST' : 'LISTENER';
     roleBadge.className = `badge role-badge ${isHost ? 'host' : 'listener'}`;
     userCountEl.innerText = String(data.userCount || 0);
-    setPlaybackControlsEnabled(isHost);
+    setPlaybackControlsEnabled(true);
 
     currentQueueMeta = Array.isArray(data.queue) ? data.queue : [];
     renderQueue(currentQueueMeta);
@@ -1044,14 +1044,23 @@ document.addEventListener('visibilitychange', () => {
 
 function startSilentKeepalive() {
     try {
-        const context = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
+        // A tiny, 1-sample silent WAV encoded in base64. 
+        // iOS/Android will allow background execution if an actual <audio> element is actively playing.
+        const audio = new Audio();
+        audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+        audio.loop = true;
+        audio.volume = 0.01;
 
-        gain.gain.value = 0.001;
-        oscillator.connect(gain);
-        gain.connect(context.destination);
-        oscillator.start();
+        const forcePlay = () => {
+            audio.play().catch(() => { });
+            document.removeEventListener('click', forcePlay);
+            document.removeEventListener('touchstart', forcePlay);
+        };
+
+        document.addEventListener('click', forcePlay);
+        document.addEventListener('touchstart', forcePlay);
+
+        audio.play().catch(() => { });
     } catch {
         // no-op
     }
