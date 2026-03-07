@@ -117,31 +117,40 @@ function setPlaybackControlsEnabled(enabled) {
 
 function schedulePlaybackHealthCheck(expectedTime) {
     clearTimeout(playbackHealthTimer);
-    playbackHealthTimer = setTimeout(() => {
+    let retries = 0;
+    const maxRetries = 3;
+
+    function attemptResume() {
         if (isHost || !isPlayerReady || !currentVideoId) return;
         if (player.getPlayerState() === YT.PlayerState.PLAYING) return;
 
-        // Try auto-resuming first before showing the modal
+        retries++;
         suppressStateEvents(1500);
         player.loadVideoById(currentVideoId, expectedTime || 0);
         player.playVideo();
 
-        // If still not playing after 2s, show the manual resume button
         setTimeout(() => {
             if (player.getPlayerState() === YT.PlayerState.PLAYING) return;
+            if (retries < maxRetries) {
+                attemptResume(); // Try again
+                return;
+            }
+            // All retries failed — show manual button as last resort
             pendingResumeTime = expectedTime;
             pendingResumeState = 'PLAY';
             showModal(
                 'Tap to Play',
-                'Your browser blocked autoplay. Tap below to start audio.',
+                'Tap below to start audio.',
                 'Resume Audio',
                 () => {
                     hideModal();
                     forceListenerPlayback(pendingResumeTime, pendingResumeState);
                 }
             );
-        }, 2000);
-    }, 3000);
+        }, 1500);
+    }
+
+    playbackHealthTimer = setTimeout(attemptResume, 2000);
 }
 
 function forceListenerPlayback(targetTime, state) {

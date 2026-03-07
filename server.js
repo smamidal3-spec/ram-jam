@@ -65,7 +65,7 @@ async function spotifySearch(query, limit = 5) {
         const data = await resp.json();
         return (data.tracks?.items || []).map(t => ({
             spotifyId: t.id,
-            title: `${t.artists.map(a => a.name).join(', ')} - ${t.name}`,
+            title: `${t.name} - ${t.artists.map(a => a.name).join(', ')}`,
             artist: t.artists.map(a => a.name).join(', '),
             trackName: t.name,
             thumbnail: t.album?.images?.[0]?.url || '',
@@ -147,7 +147,7 @@ app.get('/api/search', async (req, res) => {
         // Try Spotify — fast, returns instantly
         const spotifyResults = await spotifySearch(query);
         if (spotifyResults && spotifyResults.length > 0) {
-            return res.json(spotifyResults.map(t => ({
+            const mapped = spotifyResults.map(t => ({
                 title: t.title,
                 author: t.artist,
                 thumbnail: t.thumbnail,
@@ -156,7 +156,11 @@ app.get('/api/search', async (req, res) => {
                 trackName: t.trackName,
                 artist: t.artist,
                 source: 'spotify'
-            })));
+            }));
+            res.json(mapped);
+            // Fire-and-forget: pre-warm YouTube cache in background
+            spotifyResults.forEach(t => resolveYouTubeId(t.artist, t.trackName).catch(() => { }));
+            return;
         }
 
         // Fallback to yt-search
