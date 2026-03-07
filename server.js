@@ -3,7 +3,7 @@ const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io');
 const crypto = require('crypto');
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || '';
+const ytSearch = require('yt-search');
 
 const app = express();
 const server = http.createServer(app);
@@ -241,17 +241,19 @@ function removeSocketFromRoom(socket, sessionId) {
 }
 
 async function youtubeSearch(query, maxResults = 1) {
-    if (!YOUTUBE_API_KEY) return [];
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}`;
-    const resp = await fetch(url);
-    if (!resp.ok) return [];
-    const data = await resp.json();
-    return (data.items || []).map(item => ({
-        videoId: item.id?.videoId,
-        title: item.snippet?.title || '',
-        thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || '',
-        author: item.snippet?.channelTitle || 'Unknown'
-    }));
+    try {
+        const results = await ytSearch(query);
+        const videos = results.videos.slice(0, maxResults);
+        return videos.map(item => ({
+            videoId: item.videoId,
+            title: item.title,
+            thumbnail: item.thumbnail,
+            author: item.author?.name || 'Unknown'
+        }));
+    } catch (err) {
+        console.error('yt-search failed:', err);
+        return [];
+    }
 }
 
 async function resolveYouTubeId(artist, track) {
