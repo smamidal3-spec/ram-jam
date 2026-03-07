@@ -3,7 +3,7 @@ const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io');
 const crypto = require('crypto');
-const ytSearch = require('yt-search');
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || '';
 
 const app = express();
 const server = http.createServer(app);
@@ -240,6 +240,20 @@ function removeSocketFromRoom(socket, sessionId) {
     io.to(sessionId).emit('USER_LEFT', { userCount: room.users.size });
 }
 
+async function youtubeSearch(query, maxResults = 1) {
+    if (!YOUTUBE_API_KEY) return [];
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${YOUTUBE_API_KEY}`;
+    const resp = await fetch(url);
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    return (data.items || []).map(item => ({
+        videoId: item.id?.videoId,
+        title: item.snippet?.title || '',
+        thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || '',
+        author: item.snippet?.channelTitle || 'Unknown'
+    }));
+}
+
 async function resolveYouTubeId(artist, track) {
     const cacheKey = `${artist}||${track}`.toLowerCase();
     if (ytCache.has(cacheKey)) {
@@ -247,8 +261,8 @@ async function resolveYouTubeId(artist, track) {
     }
 
     try {
-        const result = await ytSearch(`${artist} ${track} official audio`);
-        const videoId = result.videos.length > 0 ? result.videos[0].videoId : null;
+        const results = await youtubeSearch(`${artist} ${track} official audio`, 1);
+        const videoId = results.length > 0 ? results[0].videoId : null;
         if (videoId) {
             ytCache.set(cacheKey, videoId);
         }
@@ -337,15 +351,8 @@ app.get('/api/search', async (req, res) => {
     }
 
     try {
-        const result = await ytSearch(query);
-        const videos = result.videos.slice(0, 8).map((video) => ({
-            videoId: video.videoId,
-            title: video.title,
-            thumbnail: video.thumbnail,
-            author: video.author?.name || 'Unknown',
-            source: 'youtube'
-        }));
-        res.json(videos);
+        const videos = await youtubeSearch(query, 8);
+        res.json(videos.map(v => ({ ...v, source: 'youtube' })));
     } catch (err) {
         console.error('YouTube search error:', err);
         res.json([]);
