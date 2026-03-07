@@ -8,17 +8,19 @@ const ytSearch = require('yt-search');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    cors: { origin: '*' },
     transports: ['polling', 'websocket'],
     allowUpgrades: true,
     pingInterval: 25000,
     pingTimeout: 20000
 });
 
-// Serve frontend static files without cache to force reload HTML/JS/CSS updates
+const SESSION_ID_PATTERN = /^[A-Z0-9]{4,16}$/;
+const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{6,32}$/;
+const ALLOWED_CONTROL_TYPES = new Set(['PLAY', 'PAUSE', 'SEEK', 'VIDEO_CHANGE']);
+
 app.use(express.static(path.join(__dirname, 'public'), {
     index: false,
-    setHeaders: (res, path) => {
+    setHeaders: (res) => {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
@@ -26,180 +28,355 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 app.use(express.json());
 
-// ─── Spotify API (Client Credentials) ─────────────────────
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
 const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || '';
 let spotifyToken = null;
 let spotifyTokenExpiry = 0;
 
 async function getSpotifyToken() {
-    if (spotifyToken && Date.now() < spotifyTokenExpiry) return spotifyToken;
-    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) return null;
+    if (spotifyToken && Date.now() < spotifyTokenExpiry) {
+        return spotifyToken;
+    }
+    if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+        return null;
+    }
+
     try {
         const resp = await fetch('https://accounts.spotify.com/api/token', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Authorization': 'Basic ' + Buffer.from(SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).toString('base64')
+                'Authorization': `Basic ${Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
             },
             body: 'grant_type=client_credentials'
         });
         const data = await resp.json();
-        if (data.access_token) {
-            spotifyToken = data.access_token;
-            spotifyTokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
-            return spotifyToken;
+        if (!data.access_token) {
+            return null;
         }
-    } catch (e) { console.error('Spotify auth error:', e); }
-    return null;
+
+        spotifyToken = data.access_token;
+        spotifyTokenExpiry = Date.now() + (Math.max(60, data.expires_in || 3600) - 60) * 1000;
+        return spotifyToken;
+    } catch (err) {
+        console.error('Spotify auth error:', err);
+        return null;
+    }
 }
 
 async function spotifySearch(query, limit = 5) {
     const token = await getSpotifyToken();
-    if (!token) return null;
+    if (!token) {
+        return null;
+    }
+
     try {
         const resp = await fetch(
             `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}`,
-            { headers: { 'Authorization': `Bearer ${token}` } }
+            { headers: { Authorization: `Bearer ${token}` } }
         );
         const data = await resp.json();
-        return (data.tracks?.items || []).map(t => ({
-            spotifyId: t.id,
-            title: `${t.name} - ${t.artists.map(a => a.name).join(', ')}`,
-            artist: t.artists.map(a => a.name).join(', '),
-            trackName: t.name,
-            thumbnail: t.album?.images?.[0]?.url || '',
-            duration: Math.round(t.duration_ms / 1000),
-            album: t.album?.name || ''
+        return (data.tracks?.items || []).map((track) => ({
+            spotifyId: track.id,
+            title: `${track.name} - ${track.artists.map((artist) => artist.name).join(', ')}`,
+            artist: track.artists.map((artist) => artist.name).join(', '),
+            trackName: track.name,
+            thumbnail: track.album?.images?.[0]?.url || '',
+            duration: Math.round(track.duration_ms / 1000),
+            album: track.album?.name || ''
         }));
-    } catch (e) { console.error('Spotify search error:', e); }
-    return null;
+    } catch (err) {
+        console.error('Spotify search error:', err);
+        return null;
+    }
 }
 
-// YouTube resolve cache — same song never resolved twice
 const ytCache = new Map();
+const rooms = new Map();
 
-async function resolveYouTubeId(artist, track) {
-    const key = `${artist}||${track}`.toLowerCase();
-    if (ytCache.has(key)) return ytCache.get(key);
-    try {
-        const r = await ytSearch(`${artist} ${track} official audio`);
-        const videoId = r.videos.length > 0 ? r.videos[0].videoId : null;
-        if (videoId) ytCache.set(key, videoId);
-        return videoId;
-    } catch (e) { return null; }
-}
-
-// In-memory Room State
-const rooms = {};
-
-// Helper to generate a room ID
-function generateSessionId() {
-    return crypto.randomBytes(3).toString('hex').toUpperCase(); // e.g. "A1B2C3"
+function clampString(value, maxLen) {
+    if (typeof value !== 'string') {
+        return '';
+    }
+    return value.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, maxLen);
 }
 
 function normalizeSessionId(value) {
-    if (typeof value !== 'string') return null;
-    const trimmed = value.trim();
-    if (!trimmed) return null;
-    return trimmed;
+    if (typeof value !== 'string') {
+        return null;
+    }
+    const normalized = value.trim().toUpperCase();
+    if (!SESSION_ID_PATTERN.test(normalized)) {
+        return null;
+    }
+    return normalized;
+}
+
+function normalizeVideoId(value) {
+    if (typeof value !== 'string') {
+        return null;
+    }
+    const normalized = value.trim();
+    if (!VIDEO_ID_PATTERN.test(normalized)) {
+        return null;
+    }
+    return normalized;
+}
+
+function sanitizeThumbnail(value, videoId) {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (/^https?:\/\//i.test(trimmed)) {
+            return trimmed.slice(0, 500);
+        }
+    }
+    if (videoId) {
+        return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    }
+    return '';
+}
+
+function normalizeQueueItem(input) {
+    const videoId = normalizeVideoId(input?.videoId);
+    if (!videoId) {
+        return null;
+    }
+    const title = clampString(input?.title, 140) || `Track ${videoId}`;
+    return {
+        videoId,
+        title,
+        thumbnail: sanitizeThumbnail(input?.thumbnail, videoId)
+    };
+}
+
+function createRoom(hostSocketId) {
+    return {
+        hostSocketId,
+        users: new Set(),
+        queue: [],
+        currentVideo: null
+    };
+}
+
+function cloneQueue(queue) {
+    return queue.map((item) => ({ ...item }));
+}
+
+function cloneCurrentVideo(currentVideo) {
+    return currentVideo ? { ...currentVideo } : null;
+}
+
+function ensureRoomHost(room) {
+    if (room.users.size === 0) {
+        room.hostSocketId = null;
+        return;
+    }
+    if (!room.hostSocketId || !room.users.has(room.hostSocketId)) {
+        room.hostSocketId = room.users.values().next().value;
+    }
+}
+
+function getJoinedRoom(sessionId, socketId) {
+    const room = rooms.get(sessionId);
+    if (!room || !room.users.has(socketId)) {
+        return null;
+    }
+    return room;
+}
+
+function playNextInRoom(sessionId, room) {
+    if (room.queue.length === 0) {
+        return false;
+    }
+
+    const nextVideo = room.queue.shift();
+    room.currentVideo = nextVideo;
+
+    io.to(sessionId).emit('QUEUE_UPDATE', cloneQueue(room.queue));
+    io.to(sessionId).emit('CONTROL_EVENT', {
+        sessionId,
+        type: 'VIDEO_CHANGE',
+        videoId: nextVideo.videoId,
+        title: nextVideo.title,
+        thumbnail: nextVideo.thumbnail,
+        time: 0,
+        issuedAt: Date.now()
+    });
+    return true;
+}
+
+function clearSessionIdForRoomMembers(sessionId, room) {
+    for (const memberId of room.users) {
+        const memberSocket = io.sockets.sockets.get(memberId);
+        if (memberSocket && memberSocket.data.sessionId === sessionId) {
+            memberSocket.data.sessionId = null;
+        }
+    }
+}
+
+function removeSocketFromRoom(socket, sessionId) {
+    const room = rooms.get(sessionId);
+    if (!room || !room.users.has(socket.id)) {
+        return;
+    }
+
+    const wasHost = socket.id === room.hostSocketId;
+    room.users.delete(socket.id);
+    socket.leave(sessionId);
+
+    if (room.users.size === 0) {
+        rooms.delete(sessionId);
+        return;
+    }
+
+    if (wasHost) {
+        io.to(sessionId).emit('SESSION_ENDED', { reason: 'Host disconnected' });
+        clearSessionIdForRoomMembers(sessionId, room);
+        rooms.delete(sessionId);
+        return;
+    }
+
+    ensureRoomHost(room);
+    io.to(sessionId).emit('USER_LEFT', { userCount: room.users.size });
+}
+
+async function resolveYouTubeId(artist, track) {
+    const cacheKey = `${artist}||${track}`.toLowerCase();
+    if (ytCache.has(cacheKey)) {
+        return ytCache.get(cacheKey);
+    }
+
+    try {
+        const result = await ytSearch(`${artist} ${track} official audio`);
+        const videoId = result.videos.length > 0 ? result.videos[0].videoId : null;
+        if (videoId) {
+            ytCache.set(cacheKey, videoId);
+        }
+        return videoId;
+    } catch {
+        return null;
+    }
+}
+
+function generateSessionId() {
+    return crypto.randomBytes(3).toString('hex').toUpperCase();
+}
+
+function generateUniqueSessionId() {
+    let sessionId = generateSessionId();
+    while (rooms.has(sessionId)) {
+        sessionId = generateSessionId();
+    }
+    return sessionId;
 }
 
 function getSessionIdFromReferer(referer) {
-    if (typeof referer !== 'string' || !referer) return null;
+    if (typeof referer !== 'string' || !referer) {
+        return null;
+    }
     try {
-        const url = new URL(referer);
-        const parts = url.pathname.split('/').filter(Boolean);
+        const parsed = new URL(referer);
+        const parts = parsed.pathname.split('/').filter(Boolean);
         if (parts[0] === 'session' && parts[1]) {
             return normalizeSessionId(parts[1]);
         }
-    } catch (err) {
+    } catch {
         return null;
     }
     return null;
 }
 
-function getJoinedRoom(sessionId, socketId) {
-    const room = rooms[sessionId];
-    if (!room) return null;
-    if (!room.users.includes(socketId)) return null;
-    return room;
-}
-
-// Routes
-// 1. Root: create session and redirect
-app.get('/', (req, res) => {
-    const sessionId = generateSessionId();
+app.get('/', (_req, res) => {
+    const sessionId = generateUniqueSessionId();
     res.redirect(`/session/${sessionId}`);
 });
 
-// 2. Session route: serves the main app
 app.get('/session/:id', (req, res) => {
+    const sessionId = normalizeSessionId(req.params.id);
+    if (!sessionId) {
+        res.status(400).send('Invalid session id');
+        return;
+    }
+
+    if (sessionId !== req.params.id) {
+        res.redirect(`/session/${sessionId}`);
+        return;
+    }
+
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 3. Search API — Spotify first, fallback to YouTube
 app.get('/api/search', async (req, res) => {
-    const query = req.query.q;
-    if (!query) return res.status(400).json({ error: 'Query required' });
+    const query = clampString(req.query.q, 120);
+    if (!query) {
+        res.status(400).json({ error: 'Query required' });
+        return;
+    }
 
     try {
-        // Try Spotify — fast, returns instantly
         const spotifyResults = await spotifySearch(query);
         if (spotifyResults && spotifyResults.length > 0) {
-            const mapped = spotifyResults.map(t => ({
-                title: t.title,
-                author: t.artist,
-                thumbnail: t.thumbnail,
-                duration: t.duration,
-                album: t.album,
-                trackName: t.trackName,
-                artist: t.artist,
+            const mapped = spotifyResults.map((track) => ({
+                title: track.title,
+                author: track.artist,
+                thumbnail: track.thumbnail,
+                duration: track.duration,
+                album: track.album,
+                trackName: track.trackName,
+                artist: track.artist,
                 source: 'spotify'
             }));
             res.json(mapped);
-            // Fire-and-forget: pre-warm YouTube cache in background
-            spotifyResults.forEach(t => resolveYouTubeId(t.artist, t.trackName).catch(() => { }));
+            spotifyResults.forEach((track) => {
+                resolveYouTubeId(track.artist, track.trackName).catch(() => { });
+            });
             return;
         }
+    } catch (err) {
+        console.error('Spotify search path failed:', err);
+    }
 
-        // Fallback to yt-search
-        const r = await ytSearch(query);
-        const videos = r.videos.slice(0, 5).map(v => ({
-            videoId: v.videoId,
-            title: v.title,
-            thumbnail: v.thumbnail,
-            author: v.author.name,
+    try {
+        const result = await ytSearch(query);
+        const videos = result.videos.slice(0, 8).map((video) => ({
+            videoId: video.videoId,
+            title: video.title,
+            thumbnail: video.thumbnail,
+            author: video.author?.name || 'Unknown',
             source: 'youtube'
         }));
         res.json(videos);
     } catch (err) {
-        console.error('Search error:', err);
-        res.status(500).json({ error: 'Search failed' });
+        console.error('YouTube search error:', err);
+        res.json([]);
     }
 });
 
-// 4. Resolve YouTube video ID from Spotify track
 app.get('/api/resolve-yt', async (req, res) => {
-    const { artist, track } = req.query;
-    if (!artist || !track) return res.status(400).json({ error: 'artist and track required' });
+    const artist = clampString(req.query.artist, 120);
+    const track = clampString(req.query.track, 120);
+    if (!artist || !track) {
+        res.status(400).json({ error: 'artist and track required' });
+        return;
+    }
+
     try {
         const videoId = await resolveYouTubeId(artist, track);
-        if (videoId) return res.json({ videoId });
-        res.status(404).json({ error: 'No YouTube match found' });
-    } catch (err) {
+        if (!videoId) {
+            res.status(404).json({ error: 'No YouTube match found' });
+            return;
+        }
+        res.json({ videoId });
+    } catch {
         res.status(500).json({ error: 'Resolve failed' });
     }
 });
 
-// WebSockets
 io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.id}`);
-
     socket.on('JOIN_SESSION', (payload) => {
-        // Accept both legacy (string) and structured payloads.
+        const requestedSessionId = typeof payload === 'string' ? payload : payload?.sessionId;
         const sessionId =
-            normalizeSessionId(typeof payload === 'string' ? payload : payload?.sessionId) ||
+            normalizeSessionId(requestedSessionId) ||
             getSessionIdFromReferer(socket.handshake.headers?.referer);
 
         if (!sessionId) {
@@ -207,211 +384,248 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // Initialize room if it doesn't exist
-        if (!rooms[sessionId]) {
-            rooms[sessionId] = {
-                hostSocketId: socket.id,
-                users: [],
-                queue: [], // Array of { videoId, title, timestamp }
-                currentVideo: null
-            };
+        const previousSessionId = normalizeSessionId(socket.data.sessionId);
+        if (previousSessionId && previousSessionId !== sessionId) {
+            removeSocketFromRoom(socket, previousSessionId);
+            socket.data.sessionId = null;
         }
 
-        const room = rooms[sessionId];
+        let room = rooms.get(sessionId);
+        if (!room) {
+            room = createRoom(socket.id);
+            rooms.set(sessionId, room);
+        }
 
-        const alreadyJoined = room.users.includes(socket.id);
-
-        // Check room limit
-        if (!alreadyJoined && room.users.length >= 2) {
+        const alreadyJoined = room.users.has(socket.id);
+        if (!alreadyJoined && room.users.size >= 2) {
             socket.emit('SESSION_FULL');
             return;
         }
 
-        // Add user
         if (!alreadyJoined) {
-            room.users.push(socket.id);
+            room.users.add(socket.id);
+            socket.join(sessionId);
         }
-        socket.join(sessionId);
 
-        // Determine role
-        const isHost = (socket.id === room.hostSocketId);
+        ensureRoomHost(room);
+        socket.data.sessionId = sessionId;
 
-        console.log(`${socket.id} joined room ${sessionId} as ${isHost ? 'Host' : 'Listener'}`);
-
-        // Welcome event
+        const isHost = socket.id === room.hostSocketId;
         socket.emit('JOIN_SUCCESS', {
             sessionId,
             isHost,
-            queue: room.queue,
-            currentVideo: room.currentVideo,
-            userCount: room.users.length
+            queue: cloneQueue(room.queue),
+            currentVideo: cloneCurrentVideo(room.currentVideo),
+            userCount: room.users.size
         });
 
-        // Notify others
-        socket.to(sessionId).emit('USER_JOINED', { userCount: room.users.length });
-
-        // Request a full sync from host if a listener just joined
+        socket.to(sessionId).emit('USER_JOINED', { userCount: room.users.size });
         if (!isHost && room.hostSocketId) {
             io.to(room.hostSocketId).emit('REQUEST_FULL_SYNC');
         }
-
-        // Store sessionId on socket to simplify disconnect handling
-        socket.data.sessionId = sessionId;
     });
 
     socket.on('CONTROL_EVENT', (data) => {
-        // data = { sessionId, type, time, issuedAt, ... }
         const sessionId = normalizeSessionId(data?.sessionId);
-        if (!sessionId) return;
-
-        const room = getJoinedRoom(sessionId, socket.id);
-        if (!room) return;
-
-        // Host is authoritative for most controls; allow PLAY/PAUSE from any user.
-        if (socket.id !== room.hostSocketId && !['PLAY', 'PAUSE'].includes(data?.type)) return;
-
-        if (data?.type === 'VIDEO_CHANGE' && data?.videoId) {
-            room.currentVideo = {
-                videoId: data.videoId,
-                title: data.title || `Track ${data.videoId}`,
-                thumbnail: data.thumbnail || `https://img.youtube.com/vi/${data.videoId}/hqdefault.jpg`
-            };
+        if (!sessionId) {
+            return;
         }
 
-        socket.to(sessionId).emit('CONTROL_EVENT', data);
+        const room = getJoinedRoom(sessionId, socket.id);
+        if (!room || socket.id !== room.hostSocketId || !ALLOWED_CONTROL_TYPES.has(data?.type)) {
+            return;
+        }
+
+        const relay = {
+            sessionId,
+            type: data.type,
+            issuedAt: Date.now()
+        };
+
+        if (data.type === 'VIDEO_CHANGE') {
+            const nextVideo = normalizeQueueItem(data);
+            if (!nextVideo) {
+                return;
+            }
+            room.currentVideo = nextVideo;
+            relay.videoId = nextVideo.videoId;
+            relay.title = nextVideo.title;
+            relay.thumbnail = nextVideo.thumbnail;
+            relay.time = 0;
+        } else {
+            const videoId = normalizeVideoId(data.videoId) || room.currentVideo?.videoId;
+            if (!videoId) {
+                return;
+            }
+            relay.videoId = videoId;
+            relay.time = Number.isFinite(data.time) ? Math.max(0, data.time) : 0;
+        }
+
+        socket.to(sessionId).emit('CONTROL_EVENT', relay);
     });
 
     socket.on('FULL_SYNC_REPLY', (data) => {
         const sessionId = normalizeSessionId(data?.sessionId);
-        if (!sessionId) return;
+        if (!sessionId) {
+            return;
+        }
 
         const room = getJoinedRoom(sessionId, socket.id);
-        if (!room) return;
-        if (socket.id !== room.hostSocketId) return;
+        if (!room || socket.id !== room.hostSocketId) {
+            return;
+        }
 
-        socket.to(sessionId).emit('FULL_SYNC', data);
+        const videoId = normalizeVideoId(data?.videoId) || room.currentVideo?.videoId;
+        if (!videoId) {
+            return;
+        }
+
+        socket.to(sessionId).emit('FULL_SYNC', {
+            sessionId,
+            videoId,
+            time: Number.isFinite(data?.time) ? Math.max(0, data.time) : 0,
+            state: data?.state === 'PAUSE' ? 'PAUSE' : 'PLAY',
+            issuedAt: Date.now()
+        });
     });
 
     socket.on('SYNC_EVENT', (data) => {
         const sessionId = normalizeSessionId(data?.sessionId);
-        if (!sessionId) return;
+        if (!sessionId) {
+            return;
+        }
 
         const room = getJoinedRoom(sessionId, socket.id);
-        if (!room) return;
-        if (socket.id !== room.hostSocketId) return;
+        if (!room || socket.id !== room.hostSocketId) {
+            return;
+        }
 
-        socket.to(sessionId).emit('SYNC_EVENT', data);
+        const videoId = normalizeVideoId(data?.videoId) || room.currentVideo?.videoId;
+        if (!videoId) {
+            return;
+        }
+
+        socket.to(sessionId).emit('SYNC_EVENT', {
+            sessionId,
+            videoId,
+            time: Number.isFinite(data?.time) ? Math.max(0, data.time) : 0,
+            state: data?.state === 'PAUSE' ? 'PAUSE' : 'PLAY',
+            issuedAt: Date.now()
+        });
     });
 
     socket.on('ADD_TO_QUEUE', (data) => {
         const sessionId = normalizeSessionId(data?.sessionId);
-        const videoItem = data?.videoItem;
-        // videoItem = { videoId, title }
-        if (!sessionId || !videoItem?.videoId) return;
+        if (!sessionId) {
+            return;
+        }
 
         const room = getJoinedRoom(sessionId, socket.id);
-        if (!room) return;
+        if (!room) {
+            return;
+        }
+
+        const videoItem = normalizeQueueItem(data?.videoItem);
+        if (!videoItem) {
+            return;
+        }
 
         room.queue.push(videoItem);
-        // Broadcast updated queue to everyone in the room
-        io.to(sessionId).emit('QUEUE_UPDATE', room.queue);
+        io.to(sessionId).emit('QUEUE_UPDATE', cloneQueue(room.queue));
+
+        if (!room.currentVideo) {
+            playNextInRoom(sessionId, room);
+        }
     });
 
     socket.on('PLAY_NEXT', (data) => {
         const sessionId = normalizeSessionId(data?.sessionId);
-        if (!sessionId) return;
+        if (!sessionId) {
+            return;
+        }
 
         const room = getJoinedRoom(sessionId, socket.id);
-        if (!room) return;
-        // Any user in the room can skip.
-        // if (socket.id !== room.hostSocketId) return;
-
-        if (room.queue.length > 0) {
-            // Remove first item
-            const nextVideo = room.queue.shift();
-            room.currentVideo = nextVideo; // Preserve full object
-
-            // Update everyone's queue
-            io.to(sessionId).emit('QUEUE_UPDATE', room.queue);
-
-            // Force a video change event from the server
-            io.to(sessionId).emit('CONTROL_EVENT', {
-                sessionId,
-                type: 'VIDEO_CHANGE',
-                videoId: nextVideo.videoId,
-                title: nextVideo.title,
-                thumbnail: nextVideo.thumbnail,
-                time: 0,
-                issuedAt: Date.now()
-            });
+        if (!room || socket.id !== room.hostSocketId) {
+            return;
         }
+
+        playNextInRoom(sessionId, room);
     });
 
     socket.on('REMOVE_FROM_QUEUE', (data) => {
         const sessionId = normalizeSessionId(data?.sessionId);
-        if (!sessionId) return;
+        if (!sessionId) {
+            return;
+        }
+
         const room = getJoinedRoom(sessionId, socket.id);
-        if (!room) return;
-        const index = data.index;
-        if (typeof index !== 'number' || index < 0 || index >= room.queue.length) return;
+        if (!room || socket.id !== room.hostSocketId) {
+            return;
+        }
+
+        const index = data?.index;
+        if (!Number.isInteger(index) || index < 0 || index >= room.queue.length) {
+            return;
+        }
+
         room.queue.splice(index, 1);
-        io.to(sessionId).emit('QUEUE_UPDATE', room.queue);
+        io.to(sessionId).emit('QUEUE_UPDATE', cloneQueue(room.queue));
     });
 
     socket.on('REORDER_QUEUE', (data) => {
         const sessionId = normalizeSessionId(data?.sessionId);
-        if (!sessionId) return;
+        if (!sessionId) {
+            return;
+        }
+
         const room = getJoinedRoom(sessionId, socket.id);
-        if (!room) return;
-        const { fromIndex, toIndex } = data;
-        if (typeof fromIndex !== 'number' || typeof toIndex !== 'number') return;
-        if (fromIndex < 0 || fromIndex >= room.queue.length) return;
-        if (toIndex < 0 || toIndex >= room.queue.length) return;
+        if (!room || socket.id !== room.hostSocketId) {
+            return;
+        }
+
+        const fromIndex = data?.fromIndex;
+        const toIndex = data?.toIndex;
+        if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex)) {
+            return;
+        }
+        if (fromIndex < 0 || fromIndex >= room.queue.length || toIndex < 0 || toIndex >= room.queue.length) {
+            return;
+        }
+
         const [item] = room.queue.splice(fromIndex, 1);
         room.queue.splice(toIndex, 0, item);
-        io.to(sessionId).emit('QUEUE_UPDATE', room.queue);
+        io.to(sessionId).emit('QUEUE_UPDATE', cloneQueue(room.queue));
     });
 
     socket.on('CHAT_MESSAGE', (data) => {
         const sessionId = normalizeSessionId(data?.sessionId);
-        if (!sessionId) return;
+        if (!sessionId) {
+            return;
+        }
+
         const room = getJoinedRoom(sessionId, socket.id);
-        if (!room) return;
-        const message = (data.message || '').slice(0, 200);
-        if (!message) return;
+        if (!room) {
+            return;
+        }
+
+        const message = clampString(data?.message, 200);
+        if (!message) {
+            return;
+        }
+
         io.to(sessionId).emit('CHAT_MESSAGE', {
             userId: socket.id,
-            userName: (data.userName || 'Anon').slice(0, 20),
+            userName: clampString(data?.userName, 20) || 'Anon',
             message,
             timestamp: Date.now()
         });
     });
 
     socket.on('disconnect', () => {
-        console.log(`User disconnected: ${socket.id}`);
-        const sessionId = socket.data.sessionId;
-
-        if (sessionId && rooms[sessionId]) {
-            const room = rooms[sessionId];
-
-            // Remove user
-            room.users = room.users.filter(id => id !== socket.id);
-
-            if (room.users.length === 0) {
-                // Room is empty, delete it
-                delete rooms[sessionId];
-                console.log(`Room ${sessionId} deleted.`);
-            } else {
-                // Someone is still in the room
-                if (socket.id === room.hostSocketId) {
-                    // EC-1: Host disconnects -> End session
-                    io.to(sessionId).emit('SESSION_ENDED', { reason: 'Host disconnected' });
-                    delete rooms[sessionId];
-                } else {
-                    // Listener left
-                    socket.to(sessionId).emit('USER_LEFT', { userCount: room.users.length });
-                }
-            }
+        const sessionId = normalizeSessionId(socket.data.sessionId);
+        if (sessionId) {
+            removeSocketFromRoom(socket, sessionId);
+            socket.data.sessionId = null;
         }
     });
 });
