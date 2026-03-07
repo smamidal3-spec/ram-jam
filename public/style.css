@@ -185,7 +185,8 @@ body {
   justify-content: center;
   align-items: center;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  padding: 1rem 0;
 }
 
 .hidden-player {
@@ -377,8 +378,6 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 1.25rem;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .sidebar-title {
