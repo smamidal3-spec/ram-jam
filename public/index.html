@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ram's Jam</title>
+    <link rel="stylesheet" href="/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+
+    <!-- Ambient Background Mesh -->
+    <div class="background-animation">
+        <!-- Rendered purely via CSS radial-gradients -->
+    </div>
+
+    <div class="app-container">
+
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon-wrap">
+                    <svg class="logo-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <path d="M9 18V5l12-2v13" />
+                        <circle cx="6" cy="18" r="3" />
+                        <circle cx="18" cy="16" r="3" />
+                    </svg>
+                </div>
+                <h1 class="logo-text"><span>Ram's</span><span>Jam</span></h1>
+            </div>
+            <div class="session-info">
+                <div class="badge role-badge" id="roleBadge">Joining...</div>
+                <div class="badge users-badge"><span id="userCount">0</span>/2</div>
+                <button id="copyLinkBtn" class="btn-icon copy-btn" title="Copy Invite Link">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+
+            <!-- Left: Player -->
+            <section class="player-section">
+
+                <div class="video-container" id="playerWrapper">
+                    <div id="player" class="hidden-player"></div>
+
+                    <div id="albumArtContainer" class="album-art-container">
+                        <div class="album-art-frame" id="vinylRecord">
+                            <img id="albumArtImage"
+                                src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=500&auto=format&fit=crop"
+                                alt="Album Art">
+                            <div class="art-glow"></div>
+                        </div>
+                        <div class="current-track-info">
+                            <h2 id="currentTrackTitle">Ready to Jam</h2>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="controls">
+                    <div class="progress-bar-container">
+                        <input type="range" id="seekBar" class="seek-bar" value="0" min="0" max="100" step="0.1">
+                        <div class="time-display">
+                            <span id="currentTimeDisplay">0:00</span>
+                            <span id="durationDisplay">0:00</span>
+                        </div>
+                    </div>
+
+                    <div class="playback-buttons">
+                        <button id="playBtn" class="control-btn" title="Play">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="6 3 20 12 6 21 6 3"></polygon>
+                            </svg>
+                        </button>
+                        <button id="pauseBtn" class="control-btn" title="Pause">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                                <rect x="6" y="4" width="4" height="16"></rect>
+                                <rect x="14" y="4" width="4" height="16"></rect>
+                            </svg>
+                        </button>
+                        <button id="skipBtn" class="control-btn" title="Skip">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                                <polygon points="5 4 15 12 5 20 5 4"></polygon>
+                                <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Right: Sidebar -->
+            <aside class="sidebar">
+
+                <div class="sidebar-section search-section">
+                    <h3 class="sidebar-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        Search
+                    </h3>
+                    <div class="search-wrapper">
+                        <input type="text" id="searchInput" placeholder="What do you want to play?">
+                        <div id="searchResults" class="search-results hidden"></div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section queue-section-panel">
+                    <h3 class="sidebar-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="8" y1="6" x2="21" y2="6" />
+                            <line x1="8" y1="12" x2="21" y2="12" />
+                            <line x1="8" y1="18" x2="21" y2="18" />
+                            <line x1="3" y1="6" x2="3.01" y2="6" />
+                            <line x1="3" y1="12" x2="3.01" y2="12" />
+                            <line x1="3" y1="18" x2="3.01" y2="18" />
+                        </svg>
+                        Up Next
+                    </h3>
+                    <ul id="queueList" class="queue-list">
+                        <li class="empty-queue">Queue is empty</li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section chat-section">
+                    <h3 class="sidebar-title">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                        Chat
+                    </h3>
+                    <div id="chatMessages" class="chat-messages"></div>
+                    <div class="chat-input-wrapper">
+                        <input type="text" id="chatInput" placeholder="Say something..." maxlength="200">
+                        <button id="chatSendBtn" class="btn-send">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+            </aside>
+
+        </main>
+
+        <!-- Join Overlay -->
+        <div id="joinOverlay" class="overlay">
+            <div class="welcome-modal">
+                <div class="welcome-logo">
+                    <svg class="welcome-music-icon" viewBox="0 0 24 24" width="48" height="48" fill="none"
+                        stroke="currentColor" stroke-width="1.5">
+                        <path d="M9 18V5l12-2v13" />
+                        <circle cx="6" cy="18" r="3" />
+                        <circle cx="18" cy="16" r="3" />
+                    </svg>
+                    <h1 class="welcome-title"><span>Ram's</span><span>Jam</span></h1>
+                </div>
+                <p class="welcome-subtitle">Your collaborative listening room</p>
+                <div class="welcome-form">
+                    <input type="text" id="joinNameInput" placeholder="Your name" autocomplete="off">
+                    <button id="joinBtn" class="btn-join">Enter Session</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generic Modal -->
+        <div id="overlay" class="overlay hidden">
+            <div class="welcome-modal">
+                <h2 id="modalTitle">Session Status</h2>
+                <p id="modalMessage">Loading...</p>
+                <button id="modalActionBtn" class="btn-join hidden">Resume Audio</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script src="/main.js"></script>
+</body>
+
+</html>
