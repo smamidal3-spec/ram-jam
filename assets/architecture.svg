@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="520" viewBox="0 0 980 520">
+  <style>
+    .box { fill: #f8fafc; stroke: #0f172a; stroke-width: 2; rx: 12; }
+    .title { font: 700 20px Arial, sans-serif; fill: #0f172a; }
+    .text { font: 14px Arial, sans-serif; fill: #0f172a; }
+    .arrow { stroke: #0f172a; stroke-width: 2; marker-end: url(#arrow); }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L9,3 z" fill="#0f172a" />
+    </marker>
+  </defs>
+
+  <text x="28" y="36" class="title">Ram Jam Architecture</text>
+
+  <rect x="40" y="90" width="220" height="120" class="box" />
+  <text x="60" y="126" class="title">Browser Client</text>
+  <text x="60" y="152" class="text">- HTML/CSS/JS UI</text>
+  <text x="60" y="174" class="text">- YouTube Player</text>
+  <text x="60" y="196" class="text">- Socket.IO client</text>
+
+  <rect x="370" y="70" width="260" height="180" class="box" />
+  <text x="390" y="106" class="title">Node Server</text>
+  <text x="390" y="132" class="text">- Express routes</text>
+  <text x="390" y="154" class="text">- Socket.IO gateway</text>
+  <text x="390" y="176" class="text">- Room state manager</text>
+  <text x="390" y="198" class="text">- Queue + chat handling</text>
+  <text x="390" y="220" class="text">- Sync event broadcasting</text>
+
+  <rect x="730" y="90" width="220" height="120" class="box" />
+  <text x="750" y="126" class="title">External APIs</text>
+  <text x="750" y="152" class="text">- Spotify search</text>
+  <text x="750" y="174" class="text">- YouTube API/fallback</text>
+
+  <rect x="370" y="300" width="260" height="150" class="box" />
+  <text x="390" y="336" class="title">Utility + Tests</text>
+  <text x="390" y="362" class="text">- src/utils/session.js</text>
+  <text x="390" y="384" class="text">- tests/session-utils.test.js</text>
+  <text x="390" y="406" class="text">- payload validation rules</text>
+
+  <line x1="260" y1="150" x2="370" y2="150" class="arrow" />
+  <line x1="630" y1="150" x2="730" y2="150" class="arrow" />
+  <line x1="500" y1="250" x2="500" y2="300" class="arrow" />
+</svg>

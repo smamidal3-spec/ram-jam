@@ -1,28 +1,64 @@
 # Ram Jam
 
-Ram Jam is a real-time synchronized YouTube audio player that lets two users listen to the same music simultaneously. 
+## Project Title
+Ram Jam: Real-Time Collaborative Music Listening Rooms
 
-## One-Command Launcher (Windows)
-From this folder, run:
+## Project Overview
+Ram Jam is a Node.js + Socket.IO web app where two participants join the same room and listen to synchronized YouTube audio playback.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\launch-ram-jam.ps1
+## Motivation
+The project was built to explore low-latency event synchronization, resilient media control over WebSockets, and practical multiplayer UX patterns.
+
+## Features
+- Session-based rooms with host/listener roles
+- Real-time play, pause, seek, and track-switch synchronization
+- Queue management (add, remove, reorder, next)
+- Shared in-room chat
+- Search pipeline with Spotify metadata and YouTube fallback
+- Auto-recovery behavior for disconnects and session lifecycle events
+
+## Tech Stack
+- Node.js (runtime)
+- Express (HTTP server)
+- Socket.IO (real-time communication)
+- Vanilla HTML/CSS/JS frontend
+- YouTube iframe player integration
+
+## Architecture Explanation
+The server owns room state (`users`, `queue`, `currentVideo`).
+- Clients emit interaction events (`JOIN_SESSION`, `CONTROL_EVENT`, `ADD_TO_QUEUE`, etc.)
+- Server validates and normalizes payloads
+- Server broadcasts canonical state updates to all room members
+
+See [docs/architecture.md](docs/architecture.md) for details.
+
+## Installation Instructions
+```bash
+npm install
 ```
 
-This starts both `node server.js` and a Cloudflare quick tunnel, then prints an `Invite URL` you can send to your friend on another machine.
+Optional environment variables:
+- `PORT` (default `3000`)
+- `YOUTUBE_API_KEY` (comma-separated keys supported)
+- `SPOTIFY_CLIENT_ID`
+- `SPOTIFY_CLIENT_SECRET`
 
-## Deployment Instructions
+## Usage Example
+```bash
+npm run start
+```
+Open `http://localhost:3000`, share the generated `/session/<ID>` URL, and start queueing tracks.
 
-### Option 1: Render.com (Recommended for WebSockets)
-1. Go to [Render.com](https://render.com/) and create a free account.
-2. Push this folder to a new **GitHub Repository**.
-3. In Render, create a new **Web Service**.
-4. Connect your GitHub repository.
-5. Set the Build Command to: `npm install`
-6. Set the Start Command to: `npm start`
-7. Render will provide you a permanent `https://...onrender.com` URL that natively supports WebSockets.
+## Example Output
+Sample events are in [examples/socket-events.md](examples/socket-events.md).
 
-### Option 2: Railway.app
-1. Go to [Railway.app](https://railway.app/).
-2. Push this folder to a GitHub repository or use the Railway CLI (`railway up`).
-3. Railway will automatically detect the `package.json` and deploy it instantly.
+## Testing
+```bash
+npm test
+```
+
+## Future Improvements
+- Persistent room history with Redis/PostgreSQL
+- Multi-room analytics dashboard
+- Rate limiting and abuse controls for chat/search APIs
+- End-to-end browser tests in CI

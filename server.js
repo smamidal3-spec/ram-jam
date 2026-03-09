@@ -4,6 +4,13 @@ const path = require('path');
 const { Server } = require('socket.io');
 const crypto = require('crypto');
 const ytSearch = require('yt-search');
+const {
+    clampString,
+    normalizeSessionId,
+    normalizeVideoId,
+    sanitizeThumbnail,
+    normalizeQueueItem
+} = require('./src/utils/session');
 
 // Split the environment variable by commas to support multiple keys
 const YOUTUBE_API_KEYS = (process.env.YOUTUBE_API_KEY || '')
@@ -22,8 +29,6 @@ const io = new Server(server, {
     pingTimeout: 20000
 });
 
-const SESSION_ID_PATTERN = /^[A-Z0-9]{4,16}$/;
-const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{6,32}$/;
 const ALLOWED_CONTROL_TYPES = new Set(['PLAY', 'PAUSE', 'SEEK', 'VIDEO_CHANGE']);
 
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -101,61 +106,6 @@ async function spotifySearch(query, limit = 5) {
 
 const ytCache = new Map();
 const rooms = new Map();
-
-function clampString(value, maxLen) {
-    if (typeof value !== 'string') {
-        return '';
-    }
-    return value.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, maxLen);
-}
-
-function normalizeSessionId(value) {
-    if (typeof value !== 'string') {
-        return null;
-    }
-    const normalized = value.trim().toUpperCase();
-    if (!SESSION_ID_PATTERN.test(normalized)) {
-        return null;
-    }
-    return normalized;
-}
-
-function normalizeVideoId(value) {
-    if (typeof value !== 'string') {
-        return null;
-    }
-    const normalized = value.trim();
-    if (!VIDEO_ID_PATTERN.test(normalized)) {
-        return null;
-    }
-    return normalized;
-}
-
-function sanitizeThumbnail(value, videoId) {
-    if (typeof value === 'string') {
-        const trimmed = value.trim();
-        if (/^https?:\/\//i.test(trimmed)) {
-            return trimmed.slice(0, 500);
-        }
-    }
-    if (videoId) {
-        return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-    }
-    return '';
-}
-
-function normalizeQueueItem(input) {
-    const videoId = normalizeVideoId(input?.videoId);
-    if (!videoId) {
-        return null;
-    }
-    const title = clampString(input?.title, 140) || `Track ${videoId}`;
-    return {
-        videoId,
-        title,
-        thumbnail: sanitizeThumbnail(input?.thumbnail, videoId)
-    };
-}
 
 function createRoom(hostSocketId) {
     return {

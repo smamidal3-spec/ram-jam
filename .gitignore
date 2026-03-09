@@ -3,7 +3,7 @@ node_modules/
 *.log
 *.exe
 *.response
-*.txt
 .tmp/
 __pycache__/
 *.pyc
+coverage/
