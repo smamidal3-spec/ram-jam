@@ -38,7 +38,47 @@ const ALLOWED_CONTROL_TYPES = new Set(['PLAY', 'PAUSE', 'SEEK', 'VIDEO_CHANGE'])
 // Cache for YouTube search results to save quota
 // Structure: Map<query, { results: any[], timestamp: number }>
 const searchCache = new Map();
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour caching
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // Increase to 24 hours for better saving
+const CACHE_FILE = path.join(__dirname, 'search_cache.json');
+const YT_MAPPING_FILE = path.join(__dirname, 'yt_mapping_cache.json');
+
+// Memory cache for Spotify -> YouTube mapping
+const ytCache = new Map();
+
+// Load cache from file if it exists
+try {
+    const fs = require('fs');
+    if (fs.existsSync(CACHE_FILE)) {
+        const data = JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8'));
+        Object.entries(data).forEach(([key, val]) => {
+            if (Date.now() - val.timestamp < CACHE_TTL_MS) {
+                searchCache.set(key, val);
+            }
+        });
+        console.log(`[Cache] Loaded ${searchCache.size} search entries.`);
+    }
+
+    if (fs.existsSync(YT_MAPPING_FILE)) {
+        const mappingData = JSON.parse(fs.readFileSync(YT_MAPPING_FILE, 'utf8'));
+        Object.entries(mappingData).forEach(([key, val]) => ytCache.set(key, val));
+        console.log(`[Cache] Loaded ${ytCache.size} track mappings.`);
+    }
+} catch (err) {
+    console.error('[Cache] Load failed:', err.message);
+}
+
+function saveCacheToFile() {
+    try {
+        const fs = require('fs');
+        const searchData = Object.fromEntries(searchCache);
+        fs.writeFileSync(CACHE_FILE, JSON.stringify(searchData), 'utf8');
+        
+        const mappingData = Object.fromEntries(ytCache);
+        fs.writeFileSync(YT_MAPPING_FILE, JSON.stringify(mappingData), 'utf8');
+    } catch (err) {
+        // no-op
+    }
+}
 
 app.get('/', (_req, res) => {
     const sessionId = generateUniqueSessionId();
@@ -133,7 +173,6 @@ async function spotifySearch(query, limit = 5) {
     }
 }
 
-const ytCache = new Map();
 const rooms = new Map();
 
 function createRoom(hostSocketId) {
@@ -266,8 +305,55 @@ function removeSocketFromRoom(socket, sessionId) {
     io.to(sessionId).emit('USER_LEFT', { userCount: room.users.size });
 }
 
+function extractYoutubeId(text) {
+    if (!text) return null;
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/i;
+    const match = text.match(regex);
+    if (match && match[1]) return match[1];
+    
+    // Check if it's already just a video ID
+    if (/^[a-zA-Z0-9_-]{11}$/.test(text.trim())) return text.trim();
+    
+    return null;
+}
+
+async function youtubeGetVideoDetails(videoId) {
+    if (YOUTUBE_API_KEYS.length === 0) return null;
+
+    // Use current key
+    const apiKey = YOUTUBE_API_KEYS[currentYtKeyIndex];
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`;
+
+    try {
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (resp.ok && data.items?.[0]) {
+            const item = data.items[0];
+            return [{
+                videoId: item.id,
+                title: item.snippet?.title || '',
+                thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || '',
+                author: item.snippet?.channelTitle || 'Unknown'
+            }];
+        }
+    } catch (err) {
+        console.error('[YouTube API] Detail fetch failed:', err.message);
+    }
+    return null;
+}
+
 async function youtubeSearch(query, maxResults = 1) {
-    const cacheKey = `${query.toLowerCase().trim()}_${maxResults}`;
+    const cleanQuery = query.toLowerCase().trim();
+    
+    // QUOTA SAVER: If it's a URL, use the Detail endpoint (1 unit) instead of Search (100 units)
+    const directId = extractYoutubeId(query);
+    if (directId) {
+        console.log(`[YouTube API] ID detected: ${directId}. Using 1-unit detail fetch.`);
+        const details = await youtubeGetVideoDetails(directId);
+        if (details) return details;
+    }
+
+    const cacheKey = `${cleanQuery}_${maxResults}`;
     const cached = searchCache.get(cacheKey);
 
     if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
@@ -300,6 +386,7 @@ async function youtubeSearch(query, maxResults = 1) {
 
                 // Save to cache
                 searchCache.set(cacheKey, { results, timestamp: Date.now() });
+                saveCacheToFile();
                 return results;
             }
 
@@ -348,6 +435,7 @@ async function resolveYouTubeId(artist, track) {
         const videoId = results.length > 0 ? results[0].videoId : null;
         if (videoId) {
             ytCache.set(cacheKey, videoId);
+            saveCacheToFile();
         }
         return videoId;
     } catch {
