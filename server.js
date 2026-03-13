@@ -13,11 +13,14 @@ const {
     normalizeQueueItem
 } = require('./src/utils/session');
 
-// Split the environment variable by commas to support multiple keys
-const YOUTUBE_API_KEYS = (process.env.YOUTUBE_API_KEY || '')
+// Support both singular and plural env var names for convenience
+const YOUTUBE_API_KEYS_RAW = process.env.YOUTUBE_API_KEY || process.env.YOUTUBE_API_KEYS || '';
+const YOUTUBE_API_KEYS = YOUTUBE_API_KEYS_RAW
     .split(',')
     .map(key => key.trim())
     .filter(Boolean);
+
+console.log(`[YouTube API] Detected ${YOUTUBE_API_KEYS.length} keys.`);
 
 let currentYtKeyIndex = 0;
 
@@ -299,7 +302,7 @@ async function youtubeSearch(query, maxResults = 1) {
                 // Loop continues to retry with the new key...
             } else {
                 // Some other API error occurred, FALLBACK
-                console.warn(`YouTube API Error: ${resp.status}. Falling back to yt-search.`, data);
+                console.error(`[YouTube API] Error ${resp.status} with key index ${currentYtKeyIndex}. Switching to scraper fallback.`, data);
                 return await executeYtSearch(query, maxResults);
             }
         } catch (err) {
