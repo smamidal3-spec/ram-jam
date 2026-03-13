@@ -81,15 +81,15 @@ function initGSAPBackground() {
     
     blobs.forEach((selector, i) => {
         gsap.to(selector, {
-            x: "random(-200, 200)",
-            y: "random(-200, 200)",
-            scale: "random(0.8, 1.4)",
-            rotation: "random(-180, 180)",
-            duration: "random(10, 20)",
+            x: "random(-400, 400)",
+            y: "random(-400, 400)",
+            scale: "random(1, 1.8)",
+            rotation: "random(-360, 360)",
+            duration: "random(4, 8)",
             repeat: -1,
             yoyo: true,
             ease: "sine.inOut",
-            delay: i * -5
+            delay: i * -2
         });
     });
     
