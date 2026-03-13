@@ -435,14 +435,19 @@ app.get('/api/resolve-yt', async (req, res) => {
 io.on('connection', (socket) => {
     socket.on('JOIN_SESSION', (payload) => {
         const requestedSessionId = typeof payload === 'string' ? payload : payload?.sessionId;
-        const sessionId =
-            normalizeSessionId(requestedSessionId) ||
-            getSessionIdFromReferer(socket.handshake.headers?.referer);
+        const sessionIdRaw = requestedSessionId || getSessionIdFromReferer(socket.handshake.headers?.referer);
+        const sessionId = normalizeSessionId(sessionIdRaw);
 
         if (!sessionId) {
-            socket.emit('JOIN_ERROR', { message: 'Invalid session id' });
+            console.warn(`[JOIN_ERROR] Invalid session id. Socket: ${socket.id}, Requested: "${requestedSessionId}", Referer: "${socket.handshake.headers?.referer}"`);
+            socket.emit('JOIN_ERROR', { 
+                message: 'Invalid session id',
+                debug: { requested: requestedSessionId, hasReferer: !!socket.handshake.headers?.referer }
+            });
             return;
         }
+
+        console.log(`[JOIN_SUCCESS] Session: ${sessionId}, Socket: ${socket.id}`);
 
         const previousSessionId = normalizeSessionId(socket.data.sessionId);
         if (previousSessionId && previousSessionId !== sessionId) {

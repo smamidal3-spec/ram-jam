@@ -51,6 +51,10 @@ function extractSessionId() {
 
 const sessionId = extractSessionId();
 
+if (!sessionId && window.location.pathname !== '/') {
+    window.location.href = '/';
+}
+
 const roleBadge = document.getElementById('roleBadge');
 const userCountEl = document.getElementById('userCount');
 const copyLinkBtn = document.getElementById('copyLinkBtn');
