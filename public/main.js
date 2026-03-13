@@ -151,7 +151,7 @@ function schedulePlaybackHealthCheck(expectedTime) {
     const maxRetries = 3;
 
     function attemptResume() {
-        if (isHost || !isPlayerReady || !currentVideoId) {
+        if (!isPlayerReady || !currentVideoId) {
             return;
         }
         if (player.getPlayerState() === YT.PlayerState.PLAYING) {
@@ -912,7 +912,7 @@ function renderQueue(queue) {
         const li = document.createElement('li');
         li.className = 'queue-item';
         li.dataset.index = String(index);
-        li.draggable = isHost;
+        li.draggable = true; // Everyone can drag
 
         const handle = document.createElement('span');
         handle.className = 'drag-handle';
@@ -935,13 +935,10 @@ function renderQueue(queue) {
         removeBtn.title = 'Remove';
         removeBtn.type = 'button';
         removeBtn.textContent = 'x';
-        removeBtn.style.display = isHost ? 'inline-block' : 'none';
+        removeBtn.style.display = 'inline-block'; // Everyone can remove
 
         removeBtn.addEventListener('click', (event) => {
             event.stopPropagation();
-            if (!isHost) {
-                return;
-            }
             socket.emit('REMOVE_FROM_QUEUE', { sessionId, index });
         });
 
@@ -950,33 +947,31 @@ function renderQueue(queue) {
         li.appendChild(details);
         li.appendChild(removeBtn);
 
-        if (isHost) {
-            li.addEventListener('dragstart', (event) => {
-                event.dataTransfer.effectAllowed = 'move';
-                event.dataTransfer.setData('text/plain', String(index));
-                li.classList.add('dragging');
-            });
-            li.addEventListener('dragend', () => {
-                li.classList.remove('dragging');
-            });
-            li.addEventListener('dragover', (event) => {
-                event.preventDefault();
-                event.dataTransfer.dropEffect = 'move';
-            });
-            li.addEventListener('drop', (event) => {
-                event.preventDefault();
-                const fromIdxStr = event.dataTransfer.getData('text/plain');
-                if (!fromIdxStr) return;
-                
-                const fromIndex = parseInt(fromIdxStr, 10);
-                const toIndex = parseInt(li.getAttribute('data-index'), 10);
-                
-                if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) || fromIndex === toIndex) {
-                    return;
-                }
-                socket.emit('REORDER_QUEUE', { sessionId, fromIndex, toIndex });
-            });
-        }
+        li.addEventListener('dragstart', (event) => {
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', String(index));
+            li.classList.add('dragging');
+        });
+        li.addEventListener('dragend', () => {
+            li.classList.remove('dragging');
+        });
+        li.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
+        });
+        li.addEventListener('drop', (event) => {
+            event.preventDefault();
+            const fromIdxStr = event.dataTransfer.getData('text/plain');
+            if (!fromIdxStr) return;
+            
+            const fromIndex = parseInt(fromIdxStr, 10);
+            const toIndex = parseInt(li.getAttribute('data-index'), 10);
+            
+            if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) || fromIndex === toIndex) {
+                return;
+            }
+            socket.emit('REORDER_QUEUE', { sessionId, fromIndex, toIndex });
+        });
 
         queueList.appendChild(li);
     });
