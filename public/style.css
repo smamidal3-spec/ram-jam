@@ -3,20 +3,48 @@
    ═══════════════════════════════════════════════════ */
 
 :root {
-  --bg: #0a1128;
-  --surface: rgba(255, 255, 255, 0.02);
-  --surface-2: rgba(255, 255, 255, 0.04);
-  --surface-3: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.06);
+  /* Dark Mode (Default) */
+  --bg: #03050a;
+  --surface: rgba(255, 255, 255, 0.03);
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --surface-3: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.1);
   --text: #ffffff;
-  --text-dim: #8aa1b1;
-  --text-muted: #4a6171;
+  --text-dim: #94a3b8;
+  --text-muted: #64748b;
   --accent: #ffffff;
-  --accent-glow: rgba(255, 255, 255, 0.15);
-  --accent-soft: rgba(255, 255, 255, 0.08);
-  --radius: 16px;
-  --radius-sm: 8px;
-  --transition: 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --accent-glow: rgba(255, 255, 255, 0.2);
+  --accent-soft: rgba(255, 255, 255, 0.1);
+  
+  /* Dynamic Gradient Colors - Dark */
+  --grad-1: rgba(14, 42, 92, 0.5);
+  --grad-2: rgba(20, 50, 100, 0.4);
+  --grad-3: rgba(40, 20, 80, 0.4);
+  
+  --radius: 20px;
+  --radius-sm: 10px;
+  --transition: 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f8fafc;
+    --surface: rgba(0, 0, 0, 0.02);
+    --surface-2: rgba(0, 0, 0, 0.04);
+    --surface-3: rgba(0, 0, 0, 0.06);
+    --border: rgba(0, 0, 0, 0.06);
+    --text: #0f172a;
+    --text-dim: #475569;
+    --text-muted: #94a3b8;
+    --accent: #0f172a;
+    --accent-glow: rgba(15, 23, 42, 0.1);
+    --accent-soft: rgba(15, 23, 42, 0.05);
+
+    /* Dynamic Gradient Colors - Light */
+    --grad-1: rgba(186, 230, 253, 0.6);
+    --grad-2: rgba(224, 231, 255, 0.6);
+    --grad-3: rgba(250, 232, 255, 0.6);
+  }
 }
 
 * {
@@ -60,8 +88,36 @@ body {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  background: radial-gradient(circle at 20% 30%, rgba(14, 42, 92, 0.4) 0%, transparent 60%),
-    radial-gradient(circle at 80% 70%, rgba(20, 50, 100, 0.3) 0%, transparent 60%);
+  background: var(--bg);
+}
+
+.background-animation::before,
+.background-animation::after {
+  content: "";
+  position: absolute;
+  width: 140vmax;
+  height: 140vmax;
+  top: -20vmax;
+  left: -20vmax;
+  background: radial-gradient(circle at center, var(--grad-1) 0%, transparent 60%);
+  animation: mesh-flow 25s infinite alternate ease-in-out;
+  opacity: 0.8;
+}
+
+.background-animation::after {
+  background: radial-gradient(circle at center, var(--grad-2) 0%, transparent 60%);
+  animation-duration: 20s;
+  animation-delay: -5s;
+  left: auto;
+  right: -20vmax;
+  top: auto;
+  bottom: -20vmax;
+}
+
+@keyframes mesh-flow {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  50% { transform: translate(10%, 10%) scale(1.1) rotate(5deg); }
+  100% { transform: translate(-5%, 5%) scale(1) rotate(-5deg); }
 }
 
 /* ── App Container ───────────────────────────────── */
@@ -805,6 +861,21 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.browser-tip {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  background: var(--surface-2);
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.browser-tip strong {
+  color: #ff5000; /* Brave Orange */
+  font-weight: 600;
 }
 
 #joinNameInput {
