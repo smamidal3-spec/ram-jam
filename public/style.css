@@ -89,36 +89,40 @@ body {
   overflow: hidden;
   pointer-events: none;
   background: var(--bg);
+  filter: blur(80px); /* Heavy blur for liquid feel */
 }
 
-.background-animation::before,
-.background-animation::after {
-  content: "";
+.blob {
   position: absolute;
-  width: 140vmax;
-  height: 140vmax;
-  top: -20vmax;
-  left: -20vmax;
-  background: radial-gradient(circle at center, var(--grad-1) 0%, transparent 60%);
-  animation: mesh-flow 25s infinite alternate ease-in-out;
-  opacity: 0.8;
+  border-radius: 50%;
+  opacity: 0.6;
 }
 
-.background-animation::after {
-  background: radial-gradient(circle at center, var(--grad-2) 0%, transparent 60%);
-  animation-duration: 20s;
-  animation-delay: -5s;
-  left: auto;
-  right: -20vmax;
-  top: auto;
-  bottom: -20vmax;
+.blob-1 {
+  width: 60vmax;
+  height: 60vmax;
+  background: radial-gradient(circle, var(--grad-1) 0%, transparent 70%);
+  top: -10%;
+  left: -10%;
 }
 
-@keyframes mesh-flow {
-  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
-  50% { transform: translate(10%, 10%) scale(1.1) rotate(5deg); }
-  100% { transform: translate(-5%, 5%) scale(1) rotate(-5deg); }
+.blob-2 {
+  width: 50vmax;
+  height: 50vmax;
+  background: radial-gradient(circle, var(--grad-2) 0%, transparent 70%);
+  bottom: -10%;
+  right: -10%;
 }
+
+.blob-3 {
+  width: 40vmax;
+  height: 40vmax;
+  background: radial-gradient(circle, var(--grad-3) 0%, transparent 70%);
+  top: 40%;
+  left: 30%;
+}
+
+/* CSS animation disabled in favor of GSAP */
 
 /* ── App Container ───────────────────────────────── */
 .app-container {

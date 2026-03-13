@@ -16,6 +16,66 @@ let searchTimeout;
 let activeSearchController = null;
 let searchRequestId = 0;
 
+function initBackgroundAnimation() {
+    if (typeof gsap === 'undefined') return;
+
+    // Liquid motion for blobs
+    gsap.to('.blob-1', {
+        duration: 20,
+        x: '20vw',
+        y: '10vh',
+        scale: 1.2,
+        rotation: 360,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut'
+    });
+
+    gsap.to('.blob-2', {
+        duration: 25,
+        x: '-10vw',
+        y: '-15vh',
+        scale: 1.1,
+        rotation: -360,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+        delay: 1
+    });
+
+    gsap.to('.blob-3', {
+        duration: 18,
+        x: '15vw',
+        y: '20vh',
+        scale: 1.3,
+        repeat: -1,
+        yoyo: true,
+        ease: 'sine.inOut',
+        delay: 2
+    });
+}
+
+initBackgroundAnimation();
+
+function updateVinylAnimation(isPlaying) {
+    if (typeof gsap === 'undefined') return;
+    
+    if (isPlaying) {
+        gsap.to('#vinylRecord', {
+            scale: 1.02,
+            duration: 0.8,
+            repeat: -1,
+            yoyo: true,
+            ease: 'sine.inOut'
+        });
+        document.getElementById('vinylRecord').style.animationPlayState = 'running';
+    } else {
+        gsap.killTweensOf('#vinylRecord');
+        gsap.to('#vinylRecord', { scale: 1, duration: 0.4 });
+        document.getElementById('vinylRecord').style.animationPlayState = 'paused';
+    }
+}
+
 const HARD_SYNC_DRIFT_SECONDS = 0.4;
 const PAUSED_SYNC_DRIFT_SECONDS = 0.15;
 const PLAYER_READY_WAIT_MS = 15000;
@@ -195,7 +255,7 @@ function forceListenerPlayback(targetTime, state) {
     if (state === 'PAUSE') {
         player.pauseVideo();
         player.seekTo(seekTime, true);
-        vinylRecord.style.animationPlayState = 'paused';
+        updateVinylAnimation(false);
         playBtn.style.display = 'flex';
         pauseBtn.style.display = 'none';
         return;
@@ -203,7 +263,7 @@ function forceListenerPlayback(targetTime, state) {
 
     player.loadVideoById(currentVideoId, seekTime);
     player.playVideo();
-    vinylRecord.style.animationPlayState = 'running';
+    updateVinylAnimation(true);
     playBtn.style.display = 'none';
     pauseBtn.style.display = 'flex';
     schedulePlaybackHealthCheck(seekTime);
@@ -405,6 +465,7 @@ function onPlayerStateChange(event) {
     if (event.data === YT.PlayerState.PLAYING) {
         playBtn.style.display = 'none';
         pauseBtn.style.display = 'flex';
+        updateVinylAnimation(true);
         emitControlEvent('PLAY');
         return;
     }
@@ -412,6 +473,7 @@ function onPlayerStateChange(event) {
     if (event.data === YT.PlayerState.PAUSED) {
         playBtn.style.display = 'flex';
         pauseBtn.style.display = 'none';
+        updateVinylAnimation(false);
         emitControlEvent('PAUSE');
         return;
     }
@@ -419,7 +481,7 @@ function onPlayerStateChange(event) {
     if (event.data === YT.PlayerState.ENDED) {
         playBtn.style.display = 'flex';
         pauseBtn.style.display = 'none';
-        vinylRecord.style.animationPlayState = 'paused';
+        updateVinylAnimation(false);
         socket.emit('PLAY_NEXT', { sessionId });
     }
 }
@@ -617,6 +679,7 @@ socket.on('CONTROL_EVENT', (data) => {
         suppressStateEvents(1500);
         player.loadVideoById(currentVideoId, 0);
         player.playVideo();
+        updateVinylAnimation(true);
         updateMediaSession(currentTrackMeta?.title, currentTrackMeta?.thumbnail);
 
         if (!isHost) {
@@ -633,6 +696,7 @@ socket.on('CONTROL_EVENT', (data) => {
         suppressStateEvents(1200);
         player.seekTo(expectedTime, true);
         player.playVideo();
+        updateVinylAnimation(true);
         updateMediaSession(currentTrackMeta?.title, currentTrackMeta?.thumbnail);
         schedulePlaybackHealthCheck(expectedTime);
         return;
@@ -642,6 +706,7 @@ socket.on('CONTROL_EVENT', (data) => {
         suppressStateEvents(900);
         player.pauseVideo();
         player.seekTo(expectedTime, true);
+        updateVinylAnimation(false);
         return;
     }
 
