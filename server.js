@@ -32,6 +32,11 @@ const io = new Server(server, {
 
 const ALLOWED_CONTROL_TYPES = new Set(['PLAY', 'PAUSE', 'SEEK', 'VIDEO_CHANGE']);
 
+app.get('/', (_req, res) => {
+    const sessionId = generateUniqueSessionId();
+    res.redirect(`/session/${sessionId}`);
+});
+
 app.get('/session/:id', (req, res) => {
     const sessionId = normalizeSessionId(req.params.id);
     if (!sessionId) {
@@ -50,7 +55,8 @@ app.get('/session/:id', (req, res) => {
 });
 
 app.use(express.static(path.join(__dirname, 'public'), {
-    maxAge: '1d', // Cache static assets for 1 day
+    index: false, // Don't serve index.html automatically (we handle it via /session/:id)
+    maxAge: '1d', 
     etag: true
 }));
 
@@ -365,11 +371,6 @@ function getSessionIdFromReferer(referer) {
     }
     return null;
 }
-
-app.get('/', (_req, res) => {
-    const sessionId = generateUniqueSessionId();
-    res.redirect(`/session/${sessionId}`);
-});
 
 app.get('/api/search', async (req, res) => {
     const query = clampString(req.query.q, 120);
