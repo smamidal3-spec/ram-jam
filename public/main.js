@@ -70,6 +70,35 @@ function applyTheme(theme) {
         dot.classList.toggle('active', dot.dataset.theme === theme);
     });
     localStorage.setItem('ramjam_theme', theme);
+    
+    // Flash effect on theme change
+    gsap.fromTo(".blob", { opacity: 0 }, { opacity: 0.7, duration: 1, stagger: 0.2 });
+}
+
+function initGSAPBackground() {
+    const blobs = [".blob-1", ".blob-2", ".blob-3"];
+    
+    blobs.forEach((selector, i) => {
+        gsap.to(selector, {
+            x: "random(-200, 200)",
+            y: "random(-200, 200)",
+            scale: "random(0.8, 1.4)",
+            rotation: "random(-180, 180)",
+            duration: "random(10, 20)",
+            repeat: -1,
+            yoyo: true,
+            ease: "sine.inOut",
+            delay: i * -5
+        });
+    });
+    
+    // Global subtle drift
+    gsap.to(".background-animation", {
+        rotation: 360,
+        duration: 100,
+        repeat: -1,
+        ease: "none"
+    });
 }
 
 themeDots.forEach(dot => {
@@ -79,6 +108,7 @@ themeDots.forEach(dot => {
 });
 
 initTheme();
+initGSAPBackground();
 
 setPlaybackControlsEnabled(false);
 
@@ -620,6 +650,22 @@ socket.on('CONTROL_EVENT', (data) => {
             thumbnail: sanitizeImageUrl(data.thumbnail, data.videoId)
         };
         updateAlbumArt(currentVideoId, currentTrackMeta);
+
+        // GSAP Snappy Transition Effect
+        gsap.fromTo("#playerWrapper", 
+            { scale: 0.9, filter: "blur(10px)", opacity: 0 }, 
+            { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.8, ease: "expo.out" }
+        );
+        
+        gsap.to(".blob", {
+            duration: 1.5,
+            scale: 1.8,
+            stagger: 0.1,
+            ease: "elastic.out(1, 0.3)",
+            onComplete: () => {
+                gsap.to(".blob", { scale: 1, duration: 2, ease: "power2.inOut" });
+            }
+        });
 
         suppressStateEvents(1500);
         player.loadVideoById(currentVideoId, 0);
