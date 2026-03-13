@@ -262,16 +262,14 @@ function removeSocketFromRoom(socket, sessionId) {
 }
 
 async function youtubeSearch(query, maxResults = 1) {
-    // FALLBACK 1: If no API keys are provided, scrape immediately.
     if (YOUTUBE_API_KEYS.length === 0) {
-        console.log('No YouTube API Keys configured. Using yt-search fallback.');
         return await executeYtSearch(query, maxResults);
     }
 
     const startIdx = currentYtKeyIndex;
+    let triedCount = 0;
 
-    // Loop through keys if we hit quota limits
-    while (true) {
+    while (triedCount < YOUTUBE_API_KEYS.length) {
         const apiKey = YOUTUBE_API_KEYS[currentYtKeyIndex];
         const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${apiKey}`;
 
@@ -279,7 +277,6 @@ async function youtubeSearch(query, maxResults = 1) {
             const resp = await fetch(url);
             const data = await resp.json();
 
-            // If success, return the items
             if (resp.ok) {
                 return (data.items || []).map(item => ({
                     videoId: item.id?.videoId,
@@ -289,27 +286,21 @@ async function youtubeSearch(query, maxResults = 1) {
                 }));
             }
 
-            // If we hit a quota error (403), try the next key
-            if (resp.status === 403 && data.error?.errors?.[0]?.reason === 'quotaExceeded') {
-                console.warn(`YouTube API Key at index ${currentYtKeyIndex} exhausted quota. Switching to next key.`);
-                currentYtKeyIndex = (currentYtKeyIndex + 1) % YOUTUBE_API_KEYS.length;
-
-                // If we've looped through all keys and none work, FALLBACK
-                if (currentYtKeyIndex === startIdx) {
-                    console.warn('All configured YouTube API Keys have exceeded their daily quota. Falling back to yt-search.');
-                    return await executeYtSearch(query, maxResults);
-                }
-                // Loop continues to retry with the new key...
-            } else {
-                // Some other API error occurred, FALLBACK
-                console.error(`[YouTube API] Error ${resp.status} with key index ${currentYtKeyIndex}. Switching to scraper fallback.`, data);
-                return await executeYtSearch(query, maxResults);
-            }
+            // If key failed, log why and try the next one
+            const errorReason = data.error?.errors?.[0]?.reason || 'unknown';
+            console.warn(`[YouTube API] Key ${currentYtKeyIndex} failed (${resp.status}: ${errorReason}). Trying next key...`);
+            
+            currentYtKeyIndex = (currentYtKeyIndex + 1) % YOUTUBE_API_KEYS.length;
+            triedCount++;
         } catch (err) {
-            console.warn('YouTube API Fetch failed. Falling back to yt-search.', err);
-            return await executeYtSearch(query, maxResults);
+            console.error(`[YouTube API] Key ${currentYtKeyIndex} fetch error:`, err.message);
+            currentYtKeyIndex = (currentYtKeyIndex + 1) % YOUTUBE_API_KEYS.length;
+            triedCount++;
         }
     }
+
+    console.error('[YouTube API] All keys failed. Falling back to slow scraper.');
+    return await executeYtSearch(query, maxResults);
 }
 
 // Helper to handle the yt-search scraping logic
