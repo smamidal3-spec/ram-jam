@@ -36,6 +36,7 @@ const copyLinkBtn = document.getElementById('copyLinkBtn');
 const playBtn = document.getElementById('playBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const skipBtn = document.getElementById('skipBtn');
+const backBtn = document.getElementById('backBtn');
 const seekBar = document.getElementById('seekBar');
 const currentTimeDisplay = document.getElementById('currentTimeDisplay');
 const durationDisplay = document.getElementById('durationDisplay');
@@ -60,7 +61,7 @@ let currentQueueMeta = [];
 setPlaybackControlsEnabled(false);
 
 socket = io({
-    transports: ['polling', 'websocket'],
+    transports: ['websocket', 'polling'],
     upgrade: true,
     reconnection: true,
     reconnectionAttempts: Infinity,
@@ -118,6 +119,7 @@ function setPlaybackControlsEnabled(enabled) {
     playBtn.disabled = !enabled;
     pauseBtn.disabled = !enabled;
     skipBtn.disabled = !enabled;
+    backBtn.disabled = !enabled;
     seekBar.disabled = !enabled;
 }
 
@@ -191,15 +193,19 @@ function forceListenerPlayback(targetTime, state) {
     suppressStateEvents(1500);
 
     if (state === 'PAUSE') {
-        player.cueVideoById(currentVideoId, seekTime);
         player.pauseVideo();
+        player.seekTo(seekTime, true);
         vinylRecord.style.animationPlayState = 'paused';
+        playBtn.style.display = 'flex';
+        pauseBtn.style.display = 'none';
         return;
     }
 
     player.loadVideoById(currentVideoId, seekTime);
     player.playVideo();
     vinylRecord.style.animationPlayState = 'running';
+    playBtn.style.display = 'none';
+    pauseBtn.style.display = 'flex';
     schedulePlaybackHealthCheck(seekTime);
 }
 
@@ -357,10 +363,12 @@ function onYouTubeIframeAPIReady() {
         height: '100%',
         width: '100%',
         playerVars: {
-            autoplay: 0,
+            autoplay: 1,
             controls: 1,
             disablekb: 1,
-            rel: 0
+            rel: 0,
+            playsinline: 1,
+            modestbranding: 1
         },
         events: {
             onReady: onPlayerReady,
@@ -390,16 +398,22 @@ function onPlayerStateChange(event) {
     }
 
     if (event.data === YT.PlayerState.PLAYING) {
+        playBtn.style.display = 'none';
+        pauseBtn.style.display = 'flex';
         emitControlEvent('PLAY');
         return;
     }
 
     if (event.data === YT.PlayerState.PAUSED) {
+        playBtn.style.display = 'flex';
+        pauseBtn.style.display = 'none';
         emitControlEvent('PAUSE');
         return;
     }
 
     if (event.data === YT.PlayerState.ENDED) {
+        playBtn.style.display = 'flex';
+        pauseBtn.style.display = 'none';
         vinylRecord.style.animationPlayState = 'paused';
         socket.emit('PLAY_NEXT', { sessionId });
     }
@@ -428,6 +442,19 @@ skipBtn.addEventListener('click', () => {
         return;
     }
     socket.emit('PLAY_NEXT', { sessionId });
+});
+
+backBtn.addEventListener('click', () => {
+    if (!isPlayerReady || !currentVideoId) {
+        return;
+    }
+    // If we are more than 5 seconds into the song, restart it
+    if (getPlayerTime() > 5) {
+        player.seekTo(0, true);
+        emitControlEvent('SEEK', { time: 0 });
+    } else {
+        socket.emit('PLAY_PREVIOUS', { sessionId });
+    }
 });
 
 seekBar.addEventListener('change', (event) => {
@@ -910,6 +937,7 @@ function renderQueue(queue) {
 
         if (isHost) {
             li.addEventListener('dragstart', (event) => {
+                event.dataTransfer.effectAllowed = 'move';
                 event.dataTransfer.setData('text/plain', String(index));
                 li.classList.add('dragging');
             });
@@ -918,11 +946,16 @@ function renderQueue(queue) {
             });
             li.addEventListener('dragover', (event) => {
                 event.preventDefault();
+                event.dataTransfer.dropEffect = 'move';
             });
             li.addEventListener('drop', (event) => {
                 event.preventDefault();
-                const fromIndex = parseInt(event.dataTransfer.getData('text/plain'), 10);
-                const toIndex = parseInt(li.dataset.index, 10);
+                const fromIdxStr = event.dataTransfer.getData('text/plain');
+                if (!fromIdxStr) return;
+                
+                const fromIndex = parseInt(fromIdxStr, 10);
+                const toIndex = parseInt(li.getAttribute('data-index'), 10);
+                
                 if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) || fromIndex === toIndex) {
                     return;
                 }
@@ -1044,23 +1077,29 @@ document.addEventListener('visibilitychange', () => {
 
 function startSilentKeepalive() {
     try {
-        // A tiny, 1-sample silent WAV encoded in base64. 
-        // iOS/Android will allow background execution if an actual <audio> element is actively playing.
         const audio = new Audio();
+        // A slightly longer silent WAV for better stability
         audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
         audio.loop = true;
-        audio.volume = 0.01;
+        audio.volume = 0.001;
 
+        const activators = ['click', 'touchstart', 'keydown', 'scroll'];
         const forcePlay = () => {
             audio.play().catch(() => { });
-            document.removeEventListener('click', forcePlay);
-            document.removeEventListener('touchstart', forcePlay);
+            activators.forEach(type => document.removeEventListener(type, forcePlay));
         };
 
-        document.addEventListener('click', forcePlay);
-        document.addEventListener('touchstart', forcePlay);
-
+        activators.forEach(type => document.addEventListener(type, forcePlay, { passive: true }));
+        
+        // Attempt immediate play (often fails but worth trying)
         audio.play().catch(() => { });
+
+        // Add periodic "poke" to keep the event loop alive on some mobile browsers
+        setInterval(() => {
+            if (audio.paused && hasJoined) {
+                audio.play().catch(() => {});
+            }
+        }, 5000);
     } catch {
         // no-op
     }

@@ -112,6 +112,7 @@ function createRoom(hostSocketId) {
         hostSocketId,
         users: new Set(),
         queue: [],
+        history: [],
         currentVideo: null
     };
 }
@@ -147,6 +148,11 @@ function playNextInRoom(sessionId, room) {
         return false;
     }
 
+    if (room.currentVideo) {
+        room.history.push(room.currentVideo);
+        if (room.history.length > 50) room.history.shift();
+    }
+
     const nextVideo = room.queue.shift();
     room.currentVideo = nextVideo;
 
@@ -157,6 +163,39 @@ function playNextInRoom(sessionId, room) {
         videoId: nextVideo.videoId,
         title: nextVideo.title,
         thumbnail: nextVideo.thumbnail,
+        time: 0,
+        issuedAt: Date.now()
+    });
+    return true;
+}
+
+function playPreviousInRoom(sessionId, room) {
+    if (room.history.length === 0) {
+        if (room.currentVideo) {
+            io.to(sessionId).emit('CONTROL_EVENT', {
+                sessionId,
+                type: 'PLAY',
+                videoId: room.currentVideo.videoId,
+                time: 0,
+                issuedAt: Date.now()
+            });
+        }
+        return false;
+    }
+
+    const prevVideo = room.history.pop();
+    if (room.currentVideo) {
+        room.queue.unshift(room.currentVideo);
+    }
+    room.currentVideo = prevVideo;
+
+    io.to(sessionId).emit('QUEUE_UPDATE', cloneQueue(room.queue));
+    io.to(sessionId).emit('CONTROL_EVENT', {
+        sessionId,
+        type: 'VIDEO_CHANGE',
+        videoId: prevVideo.videoId,
+        title: prevVideo.title,
+        thumbnail: prevVideo.thumbnail,
         time: 0,
         issuedAt: Date.now()
     });
@@ -560,16 +599,18 @@ io.on('connection', (socket) => {
 
     socket.on('PLAY_NEXT', (data) => {
         const sessionId = normalizeSessionId(data?.sessionId);
-        if (!sessionId) {
-            return;
-        }
-
+        if (!sessionId) return;
         const room = getJoinedRoom(sessionId, socket.id);
-        if (!room) {
-            return;
-        }
-
+        if (!room) return;
         playNextInRoom(sessionId, room);
+    });
+
+    socket.on('PLAY_PREVIOUS', (data) => {
+        const sessionId = normalizeSessionId(data?.sessionId);
+        if (!sessionId) return;
+        const room = getJoinedRoom(sessionId, socket.id);
+        if (!room) return;
+        playPreviousInRoom(sessionId, room);
     });
 
     socket.on('REMOVE_FROM_QUEUE', (data) => {
