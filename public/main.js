@@ -37,7 +37,6 @@ const playBtn = document.getElementById('playBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const skipBtn = document.getElementById('skipBtn');
 const backBtn = document.getElementById('backBtn');
-const volumeSlider = document.getElementById('volumeSlider');
 const seekBar = document.getElementById('seekBar');
 const currentTimeDisplay = document.getElementById('currentTimeDisplay');
 const durationDisplay = document.getElementById('durationDisplay');
@@ -56,54 +55,8 @@ const currentTrackTitle = document.getElementById('currentTrackTitle');
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSendBtn');
-const themeDots = document.querySelectorAll('.theme-dot');
 
 let currentQueueMeta = [];
-
-function initTheme() {
-    const saved = localStorage.getItem('ramjam_theme') || 'deep-sea';
-    applyTheme(saved);
-}
-
-function applyTheme(theme) {
-    document.body.className = theme === 'deep-sea' ? '' : `theme-${theme}`;
-    themeDots.forEach(dot => {
-        dot.classList.toggle('active', dot.dataset.theme === theme);
-    });
-    localStorage.setItem('ramjam_theme', theme);
-    
-    // Flash effect on theme change
-    gsap.fromTo(".blob", { opacity: 0 }, { opacity: 0.7, duration: 1, stagger: 0.2 });
-}
-
-function initGSAPBackground() {
-    const blobs = [".blob-1", ".blob-2", ".blob-3"];
-    
-    blobs.forEach((selector, i) => {
-        gsap.to(selector, {
-            x: "random(-400, 400)",
-            y: "random(-400, 400)",
-            scale: "random(1, 1.8)",
-            rotation: "random(-360, 360)",
-            duration: "random(4, 8)",
-            repeat: -1,
-            yoyo: true,
-            ease: "sine.inOut",
-            delay: i * -2
-        });
-    });
-    
-    // Removed global rotation drift to prevent circular motion
-}
-
-themeDots.forEach(dot => {
-    dot.addEventListener('click', () => {
-        applyTheme(dot.dataset.theme);
-    });
-});
-
-initTheme();
-initGSAPBackground();
 
 setPlaybackControlsEnabled(false);
 
@@ -447,7 +400,6 @@ function onPlayerStateChange(event) {
     if (event.data === YT.PlayerState.PLAYING) {
         playBtn.style.display = 'none';
         pauseBtn.style.display = 'flex';
-        initVolume();
         emitControlEvent('PLAY');
         return;
     }
@@ -647,26 +599,8 @@ socket.on('CONTROL_EVENT', (data) => {
         };
         updateAlbumArt(currentVideoId, currentTrackMeta);
 
-        // GSAP Snappy Transition Effect
-        gsap.fromTo("#playerWrapper", 
-            { scale: 0.9, filter: "blur(10px)", opacity: 0 }, 
-            { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.8, ease: "expo.out" }
-        );
-        
-        gsap.to(".blob", {
-            duration: 1.5,
-            scale: 1.8,
-            stagger: 0.1,
-            ease: "elastic.out(1, 0.3)",
-            onComplete: () => {
-                gsap.to(".blob", { scale: 1, duration: 2, ease: "power2.inOut" });
-            }
-        });
-
         suppressStateEvents(1500);
-        if (isPlayerReady && player) {
-            player.setVolume(localStorage.getItem('ramjam_volume') || 100);
-        }
+        player.loadVideoById(currentVideoId, 0);
         player.playVideo();
         updateMediaSession(currentTrackMeta?.title, currentTrackMeta?.thumbnail);
 
@@ -1170,22 +1104,3 @@ function startSilentKeepalive() {
         // no-op
     }
 }
-
-volumeSlider.addEventListener('input', (e) => {
-    const vol = e.target.value;
-    if (isPlayerReady && player) {
-        player.setVolume(vol);
-        localStorage.setItem('ramjam_volume', vol);
-    }
-});
-
-function initVolume() {
-    const savedVol = localStorage.getItem('ramjam_volume') || 100;
-    volumeSlider.value = savedVol;
-    if (isPlayerReady && player) {
-        player.setVolume(savedVol);
-    }
-}
-
-// Initial call
-initVolume();

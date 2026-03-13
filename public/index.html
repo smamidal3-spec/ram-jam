@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 </head>
 
@@ -16,9 +15,7 @@
 
     <!-- Ambient Background Mesh -->
     <div class="background-animation">
-        <div class="blob blob-1"></div>
-        <div class="blob blob-2"></div>
-        <div class="blob blob-3"></div>
+        <!-- Rendered purely via CSS radial-gradients -->
     </div>
 
     <div class="app-container">
@@ -37,12 +34,6 @@
                 <h1 class="logo-text"><span>Ram's</span><span>Jam</span></h1>
             </div>
             <div class="session-info">
-                <div class="theme-selector">
-                    <div class="theme-dot dot-deep-sea active" data-theme="deep-sea" title="Deep Sea"></div>
-                    <div class="theme-dot dot-sunset" data-theme="sunset" title="Sunset"></div>
-                    <div class="theme-dot dot-purple-mesh" data-theme="purple-mesh" title="Purple Mesh"></div>
-                    <div class="theme-dot dot-sky" data-theme="sky" title="Sky Blue"></div>
-                </div>
                 <div class="badge role-badge" id="roleBadge">Joining...</div>
                 <div class="badge users-badge"><span id="userCount">0</span>/2</div>
                 <button id="copyLinkBtn" class="btn-icon copy-btn" title="Copy Invite Link">
@@ -109,13 +100,6 @@
                                 <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"></line>
                             </svg>
                         </button>
-                    </div>
-
-                    <div class="volume-container">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="volume-icon">
-                            <path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07" />
-                        </svg>
-                        <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="100">
                     </div>
                 </div>
 
