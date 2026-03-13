@@ -16,50 +16,11 @@ let searchTimeout;
 let activeSearchController = null;
 let searchRequestId = 0;
 
-function initBackgroundAnimation() {
-    if (typeof gsap === 'undefined') return;
-
-    // Liquid motion for blobs
-    gsap.to('.blob-1', {
-        duration: 20,
-        x: '20vw',
-        y: '10vh',
-        scale: 1.2,
-        rotation: 360,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut'
-    });
-
-    gsap.to('.blob-2', {
-        duration: 25,
-        x: '-10vw',
-        y: '-15vh',
-        scale: 1.1,
-        rotation: -360,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-        delay: 1
-    });
-
-    gsap.to('.blob-3', {
-        duration: 18,
-        x: '15vw',
-        y: '20vh',
-        scale: 1.3,
-        repeat: -1,
-        yoyo: true,
-        ease: 'sine.inOut',
-        delay: 2
-    });
-}
-
-initBackgroundAnimation();
+// Iridescence background is now initialized via index.html module script
 
 function updateVinylAnimation(isPlaying) {
     if (typeof gsap === 'undefined') return;
-    
+
     if (isPlaying) {
         gsap.to('#vinylRecord', {
             scale: 1.02,
@@ -1028,10 +989,10 @@ function renderQueue(queue) {
             event.preventDefault();
             const fromIdxStr = event.dataTransfer.getData('text/plain');
             if (!fromIdxStr) return;
-            
+
             const fromIndex = parseInt(fromIdxStr, 10);
             const toIndex = parseInt(li.getAttribute('data-index'), 10);
-            
+
             if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex) || fromIndex === toIndex) {
                 return;
             }
@@ -1165,14 +1126,14 @@ function startSilentKeepalive() {
         };
 
         activators.forEach(type => document.addEventListener(type, forcePlay, { passive: true }));
-        
+
         // Attempt immediate play (often fails but worth trying)
         audio.play().catch(() => { });
 
         // Add periodic "poke" to keep the event loop alive on some mobile browsers
         setInterval(() => {
             if (audio.paused && hasJoined) {
-                audio.play().catch(() => {});
+                audio.play().catch(() => { });
             }
         }, 5000);
     } catch {

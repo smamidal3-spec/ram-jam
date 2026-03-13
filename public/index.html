@@ -15,11 +15,20 @@
 <body>
 
     <!-- Ambient Background Mesh -->
-    <div class="background-animation">
-        <div class="blob blob-1"></div>
-        <div class="blob blob-2"></div>
-        <div class="blob blob-3"></div>
-    </div>
+    <div class="background-animation"></div>
+
+    <script type="module">
+      import { Iridescence } from '/iridescence.js';
+      const container = document.querySelector('.background-animation');
+      if (container) {
+        new Iridescence(container, {
+          color: [0.5, 0.6, 0.8],
+          mouseReact: true,
+          amplitude: 0.1,
+          speed: 1
+        });
+      }
+    </script>
 
     <div class="app-container">
 

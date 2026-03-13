@@ -15,12 +15,12 @@
   --accent: #ffffff;
   --accent-glow: rgba(255, 255, 255, 0.2);
   --accent-soft: rgba(255, 255, 255, 0.1);
-  
+
   /* Dynamic Gradient Colors - Dark */
   --grad-1: rgba(14, 42, 92, 0.5);
   --grad-2: rgba(20, 50, 100, 0.4);
   --grad-3: rgba(40, 20, 80, 0.4);
-  
+
   --radius: 20px;
   --radius-sm: 10px;
   --transition: 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -87,42 +87,14 @@ body {
   inset: 0;
   z-index: 0;
   overflow: hidden;
-  pointer-events: none;
   background: var(--bg);
-  filter: blur(80px); /* Heavy blur for liquid feel */
 }
 
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.6;
+.background-animation canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
-
-.blob-1 {
-  width: 60vmax;
-  height: 60vmax;
-  background: radial-gradient(circle, var(--grad-1) 0%, transparent 70%);
-  top: -10%;
-  left: -10%;
-}
-
-.blob-2 {
-  width: 50vmax;
-  height: 50vmax;
-  background: radial-gradient(circle, var(--grad-2) 0%, transparent 70%);
-  bottom: -10%;
-  right: -10%;
-}
-
-.blob-3 {
-  width: 40vmax;
-  height: 40vmax;
-  background: radial-gradient(circle, var(--grad-3) 0%, transparent 70%);
-  top: 40%;
-  left: 30%;
-}
-
-/* CSS animation disabled in favor of GSAP */
 
 /* ── App Container ───────────────────────────────── */
 .app-container {
@@ -164,8 +136,17 @@ body {
 }
 
 @keyframes logo-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.8; }
-  50% { transform: scale(1.1); opacity: 1; }
+
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
 }
 
 .logo-text {
@@ -878,7 +859,8 @@ body {
 }
 
 .browser-tip strong {
-  color: #ff5000; /* Brave Orange */
+  color: #ff5000;
+  /* Brave Orange */
   font-weight: 600;
 }
 
