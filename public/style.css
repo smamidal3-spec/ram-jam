@@ -3,8 +3,12 @@
    ═══════════════════════════════════════════════════ */
 
 :root {
-  /* Dark Mode (Default) */
+  /* Theme: Deep Sea (Default) */
   --bg: #03050a;
+  --grad-1: #0e2a5c;
+  --grad-2: #281450;
+  --grad-3: #ff0000;
+  
   --surface: rgba(255, 255, 255, 0.03);
   --surface-2: rgba(255, 255, 255, 0.06);
   --surface-3: rgba(255, 255, 255, 0.1);
@@ -14,37 +18,39 @@
   --text-muted: #64748b;
   --accent: #ffffff;
   --accent-glow: rgba(255, 255, 255, 0.2);
-  --accent-soft: rgba(255, 255, 255, 0.1);
-  
-  /* Dynamic Gradient Colors - Dark */
-  --grad-1: rgba(14, 42, 92, 0.5);
-  --grad-2: rgba(20, 50, 100, 0.4);
-  --grad-3: rgba(40, 20, 80, 0.4);
   
   --radius: 20px;
   --radius-sm: 10px;
   --transition: 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f8fafc;
-    --surface: rgba(0, 0, 0, 0.02);
-    --surface-2: rgba(0, 0, 0, 0.04);
-    --surface-3: rgba(0, 0, 0, 0.06);
-    --border: rgba(0, 0, 0, 0.06);
-    --text: #0f172a;
-    --text-dim: #475569;
-    --text-muted: #94a3b8;
-    --accent: #0f172a;
-    --accent-glow: rgba(15, 23, 42, 0.1);
-    --accent-soft: rgba(15, 23, 42, 0.05);
+body.theme-sunset {
+  --bg: #ff7eb3;
+  --grad-1: #ff7eb3;
+  --grad-2: #ff758c;
+  --grad-3: #ffcc70;
+  --text: #000;
+  --text-dim: #222;
+  --surface: rgba(0, 0, 0, 0.05);
+  --border: rgba(0, 0, 0, 0.1);
+}
 
-    /* Dynamic Gradient Colors - Light */
-    --grad-1: rgba(186, 230, 253, 0.6);
-    --grad-2: rgba(224, 231, 255, 0.6);
-    --grad-3: rgba(250, 232, 255, 0.6);
-  }
+body.theme-purple-mesh {
+  --bg: #1a0b2e;
+  --grad-1: #4a1d96;
+  --grad-2: #7c2d12;
+  --grad-3: #db2777;
+}
+
+body.theme-sky {
+  --bg: #f0f9ff;
+  --grad-1: #bae6fd;
+  --grad-2: #60a5fa;
+  --grad-3: #ffffff;
+  --text: #0369a1;
+  --text-dim: #0ea5e9;
+  --surface: rgba(3, 105, 161, 0.05);
+  --border: rgba(3, 105, 161, 0.1);
 }
 
 * {
@@ -91,34 +97,80 @@ body {
   background: var(--bg);
 }
 
-.background-animation::before,
-.background-animation::after {
-  content: "";
+.background-animation .blob {
   position: absolute;
-  width: 140vmax;
-  height: 140vmax;
-  top: -20vmax;
-  left: -20vmax;
-  background: radial-gradient(circle at center, var(--grad-1) 0%, transparent 60%);
-  animation: mesh-flow 25s infinite alternate ease-in-out;
-  opacity: 0.8;
+  width: 80vmax;
+  height: 80vmax;
+  filter: blur(60px);
+  opacity: 0.6;
+  border-radius: 50%;
+  animation: move infinite alternate ease-in-out;
 }
 
-.background-animation::after {
-  background: radial-gradient(circle at center, var(--grad-2) 0%, transparent 60%);
-  animation-duration: 20s;
+.blob-1 {
+  background: var(--grad-1);
+  top: -20%;
+  left: -20%;
+  animation-duration: 25s;
+}
+
+.blob-2 {
+  background: var(--grad-2);
+  bottom: -20%;
+  right: -20%;
+  animation-duration: 30s;
   animation-delay: -5s;
-  left: auto;
-  right: -20vmax;
-  top: auto;
-  bottom: -20vmax;
 }
 
-@keyframes mesh-flow {
-  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
-  50% { transform: translate(10%, 10%) scale(1.1) rotate(5deg); }
-  100% { transform: translate(-5%, 5%) scale(1) rotate(-5deg); }
+.blob-3 {
+  background: var(--grad-3);
+  top: 40%;
+  left: 30%;
+  width: 60vmax;
+  height: 60vmax;
+  animation-duration: 20s;
+  animation-delay: -10s;
+  opacity: 0.4;
 }
+
+@keyframes move {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  33% { transform: translate(15%, 10%) scale(1.1) rotate(60deg); }
+  66% { transform: translate(-10%, 20%) scale(0.9) rotate(120deg); }
+  100% { transform: translate(5%, -15%) scale(1.05) rotate(180deg); }
+}
+
+/* ── Theme Selector ──────────────────────────────── */
+.theme-selector {
+  display: flex;
+  gap: 8px;
+  margin-right: 1.5rem;
+}
+
+.theme-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+}
+
+.theme-dot:hover {
+  transform: scale(1.2);
+  border-color: var(--text);
+}
+
+.theme-dot.active {
+  transform: scale(1.3);
+  border-color: var(--text);
+}
+
+.dot-deep-sea { background: #0e2a5c; }
+.dot-sunset { background: #ff7eb3; }
+.dot-purple-mesh { background: #4a1d96; }
+.dot-sky { background: #bae6fd; }
 
 /* ── App Container ───────────────────────────────── */
 .app-container {

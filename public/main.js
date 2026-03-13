@@ -55,8 +55,30 @@ const currentTrackTitle = document.getElementById('currentTrackTitle');
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSendBtn');
+const themeDots = document.querySelectorAll('.theme-dot');
 
 let currentQueueMeta = [];
+
+function initTheme() {
+    const saved = localStorage.getItem('ramjam_theme') || 'deep-sea';
+    applyTheme(saved);
+}
+
+function applyTheme(theme) {
+    document.body.className = theme === 'deep-sea' ? '' : `theme-${theme}`;
+    themeDots.forEach(dot => {
+        dot.classList.toggle('active', dot.dataset.theme === theme);
+    });
+    localStorage.setItem('ramjam_theme', theme);
+}
+
+themeDots.forEach(dot => {
+    dot.addEventListener('click', () => {
+        applyTheme(dot.dataset.theme);
+    });
+});
+
+initTheme();
 
 setPlaybackControlsEnabled(false);
 
