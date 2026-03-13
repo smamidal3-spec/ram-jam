@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
+    <link rel="stylesheet" href="/color-bends.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -18,14 +19,18 @@
     <div class="background-animation"></div>
 
     <script type="module">
-      import { Iridescence } from '/iridescence.js';
+      import { ColorBends } from '/color-bends.js';
       const container = document.querySelector('.background-animation');
       if (container) {
-        new Iridescence(container, {
-          color: [0.5, 0.6, 0.8],
-          mouseReact: true,
-          amplitude: 0.1,
-          speed: 1
+        new ColorBends(container, {
+          colors: ["#ff5c7a", "#8a5cff", "#00ffd1"],
+          speed: 0.2,
+          scale: 1.2,
+          frequency: 1,
+          warpStrength: 1,
+          mouseInfluence: 0.5,
+          parallax: 0.2,
+          noise: 0.05
         });
       }
     </script>
