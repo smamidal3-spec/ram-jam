@@ -19,21 +19,13 @@ let searchRequestId = 0;
 // Iridescence background is now initialized via index.html module script
 
 function updateVinylAnimation(isPlaying) {
-    if (typeof gsap === 'undefined') return;
+    const container = document.getElementById('albumArtContainer');
+    if (!container) return;
 
     if (isPlaying) {
-        gsap.to('#vinylRecord', {
-            scale: 1.02,
-            duration: 0.8,
-            repeat: -1,
-            yoyo: true,
-            ease: 'sine.inOut'
-        });
-        document.getElementById('vinylRecord').style.animationPlayState = 'running';
+        container.classList.add('playing');
     } else {
-        gsap.killTweensOf('#vinylRecord');
-        gsap.to('#vinylRecord', { scale: 1, duration: 0.4 });
-        document.getElementById('vinylRecord').style.animationPlayState = 'paused';
+        container.classList.remove('playing');
     }
 }
 

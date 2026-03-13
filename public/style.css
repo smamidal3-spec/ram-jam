@@ -248,12 +248,16 @@ body {
   height: 320px;
   border-radius: var(--radius);
   position: relative;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4), 0 0 120px 20px rgba(88, 142, 212, 0.1);
-  transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+  transition: all 0.8s ease;
+}
+
+.album-art-container.playing .album-art-frame {
+  box-shadow: 0 0 50px rgba(0, 255, 209, 0.2), 0 0 80px rgba(255, 92, 122, 0.15), 0 30px 60px rgba(0, 0, 0, 0.5);
 }
 
 .album-art-frame:hover {
-  transform: scale(1.02);
+  transform: translateY(-5px);
 }
 
 /* This ::before pseudo-element creates the dynamic glow behind the art */
