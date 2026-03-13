@@ -840,7 +840,7 @@ searchInput.addEventListener('input', (event) => {
     clearTimeout(searchTimeout);
 
     const query = event.target.value.trim();
-    if (query.length < 2) {
+    if (query.length < 3) {
         if (activeSearchController) {
             activeSearchController.abort();
             activeSearchController = null;
@@ -881,7 +881,7 @@ searchInput.addEventListener('input', (event) => {
             }
             showSearchMessage('Search failed. Check connection and retry.');
         }
-    }, 300);
+    }, 800);
 });
 
 function updateSeekBar() {

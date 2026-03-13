@@ -35,6 +35,11 @@ const io = new Server(server, {
 
 const ALLOWED_CONTROL_TYPES = new Set(['PLAY', 'PAUSE', 'SEEK', 'VIDEO_CHANGE']);
 
+// Cache for YouTube search results to save quota
+// Structure: Map<query, { results: any[], timestamp: number }>
+const searchCache = new Map();
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour caching
+
 app.get('/', (_req, res) => {
     const sessionId = generateUniqueSessionId();
     res.redirect(`/session/${sessionId}`);
@@ -262,6 +267,14 @@ function removeSocketFromRoom(socket, sessionId) {
 }
 
 async function youtubeSearch(query, maxResults = 1) {
+    const cacheKey = `${query.toLowerCase().trim()}_${maxResults}`;
+    const cached = searchCache.get(cacheKey);
+
+    if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
+        console.log(`[YouTube API] Serving from cache: "${query}"`);
+        return cached.results;
+    }
+
     if (YOUTUBE_API_KEYS.length === 0) {
         return await executeYtSearch(query, maxResults);
     }
@@ -278,12 +291,16 @@ async function youtubeSearch(query, maxResults = 1) {
             const data = await resp.json();
 
             if (resp.ok) {
-                return (data.items || []).map(item => ({
+                const results = (data.items || []).map(item => ({
                     videoId: item.id?.videoId,
                     title: item.snippet?.title || '',
                     thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.default?.url || '',
                     author: item.snippet?.channelTitle || 'Unknown'
                 }));
+
+                // Save to cache
+                searchCache.set(cacheKey, { results, timestamp: Date.now() });
+                return results;
             }
 
             // If key failed, log why and try the next one
