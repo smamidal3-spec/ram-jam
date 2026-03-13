@@ -229,6 +229,7 @@ function forceListenerPlayback(targetTime, state) {
     player.loadVideoById(currentVideoId, seekTime);
     player.playVideo();
     updateVinylAnimation(true);
+    updateMediaSession(currentTrackMeta?.title, currentTrackMeta?.thumbnail);
     playBtn.style.display = 'none';
     pauseBtn.style.display = 'flex';
     schedulePlaybackHealthCheck(seekTime);
@@ -247,6 +248,7 @@ function applySyncSnapshot(data) {
     if (currentVideoId !== data.videoId) {
         currentVideoId = data.videoId;
         updateAlbumArt(currentVideoId);
+        updateMediaSession(data.title || `Track ${data.videoId}`, data.thumbnail);
         forceListenerPlayback(expectedTime, state);
         return;
     }
@@ -1071,24 +1073,41 @@ function updateMediaSession(title, artwork) {
         navigator.mediaSession.metadata = new MediaMetadata({
             title: title || "Ram's Jam",
             artist: "Ram's Jam Session",
-            artwork: artwork ? [{ src: artwork, sizes: '512x512', type: 'image/jpeg' }] : []
+            album: "Collaborative Listening",
+            artwork: artwork ? [
+                { src: artwork, sizes: '96x96', type: 'image/jpeg' },
+                { src: artwork, sizes: '512x512', type: 'image/jpeg' }
+            ] : []
         });
+
+        const updateState = () => {
+            if (!isPlayerReady) return;
+            const state = player.getPlayerState();
+            navigator.mediaSession.playbackState = (state === YT.PlayerState.PLAYING) ? 'playing' : 'paused';
+        };
+
+        updateState();
 
         navigator.mediaSession.setActionHandler('play', () => {
             if (currentVideoId) {
                 player.playVideo();
+                updateState();
             }
         });
         navigator.mediaSession.setActionHandler('pause', () => {
             if (currentVideoId) {
                 player.pauseVideo();
+                updateState();
             }
         });
         navigator.mediaSession.setActionHandler('nexttrack', () => {
             socket.emit('PLAY_NEXT', { sessionId });
         });
-    } catch {
-        // no-op
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+            socket.emit('PLAY_PREVIOUS', { sessionId });
+        });
+    } catch (err) {
+        console.warn('MediaSession error:', err);
     }
 }
 
@@ -1110,37 +1129,71 @@ async function requestWakeLock() {
 }
 
 document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && isPlayerReady && currentVideoId) {
-        requestWakeLock();
+    if (document.visibilityState === 'visible') {
+        if (isPlayerReady && currentVideoId) {
+            requestWakeLock();
+        }
+        // Force silent audio back on
+        if (silentAudio && silentAudio.paused && hasJoined) {
+            silentAudio.play().catch(() => {});
+        }
     }
 });
 
+let silentAudio = null;
 function startSilentKeepalive() {
     try {
-        const audio = new Audio();
-        // A slightly longer silent WAV for better stability
-        audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-        audio.loop = true;
-        audio.volume = 0.001;
+        if (silentAudio) return;
+        
+        silentAudio = new Audio();
+        // 1-second silent WAV, better for mobile OS recognition
+        silentAudio.src = 'data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhIAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHEAZGEA';
+        silentAudio.loop = true;
+        silentAudio.volume = 0.01; // Slightly higher but still inaudible
 
-        const activators = ['click', 'touchstart', 'keydown', 'scroll'];
+        const activators = ['click', 'touchstart', 'mousedown', 'keydown'];
         const forcePlay = () => {
-            audio.play().catch(() => { });
+            silentAudio.play()
+                .then(() => console.log('Silent keepalive started'))
+                .catch(() => { });
+            
+            // Also try to "prime" the player if it was waiting
+            if (isPlayerReady && currentVideoId && player.getPlayerState() === YT.PlayerState.UNSTARTED) {
+                player.playVideo();
+            }
+            
             activators.forEach(type => document.removeEventListener(type, forcePlay));
         };
 
         activators.forEach(type => document.addEventListener(type, forcePlay, { passive: true }));
 
-        // Attempt immediate play (often fails but worth trying)
-        audio.play().catch(() => { });
+        // Attempt immediate play
+        silentAudio.play().catch(() => { });
 
-        // Add periodic "poke" to keep the event loop alive on some mobile browsers
+        // Heavy-duty background interval
         setInterval(() => {
-            if (audio.paused && hasJoined) {
-                audio.play().catch(() => { });
+            if (!hasJoined) return;
+            
+            // Poke silent audio
+            if (silentAudio.paused) {
+                silentAudio.play().catch(() => {});
             }
-        }, 5000);
-    } catch {
-        // no-op
+            
+            // Poke YouTube player if it stalled in background
+            if (isPlayerReady && currentVideoId) {
+                const state = player.getPlayerState();
+                if (state === YT.PlayerState.BUFFERING || state === YT.PlayerState.PAUSED) {
+                    // Only auto-resume if we're supposed to be playing
+                    if (!isHost) {
+                        try {
+                            // Gentle poke - don't reload, just play
+                            player.playVideo();
+                        } catch {}
+                    }
+                }
+            }
+        }, 3000);
+    } catch (err) {
+        console.warn('Silent keepalive init error:', err);
     }
 }
