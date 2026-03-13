@@ -56,39 +56,47 @@ export class Iridescence {
   }
 
   init() {
-    this.renderer = new Renderer();
-    this.gl = this.renderer.gl;
-    this.gl.clearColor(0, 0, 0, 0);
+    try {
+      this.renderer = new Renderer();
+      this.gl = this.renderer.gl;
+      this.gl.clearColor(0, 0, 0, 0);
 
-    this.geometry = new Triangle(this.gl);
-    this.program = new Program(this.gl, {
-      vertex: vertexShader,
-      fragment: fragmentShader,
-      uniforms: {
-        uTime: { value: 0 },
-        uColor: { value: new Color(...this.color) },
-        uResolution: {
-          value: new Color(this.gl.canvas.width, this.gl.canvas.height, this.gl.canvas.width / this.gl.canvas.height)
-        },
-        uMouse: { value: new Float32Array([this.mousePos.x, this.mousePos.y]) },
-        uAmplitude: { value: this.amplitude },
-        uSpeed: { value: this.speed }
+      this.geometry = new Triangle(this.gl);
+      this.program = new Program(this.gl, {
+        vertex: vertexShader,
+        fragment: fragmentShader,
+        uniforms: {
+          uTime: { value: 0 },
+          uColor: { value: new Color(...this.color) },
+          uResolution: {
+            value: new Color(this.gl.canvas.width, this.gl.canvas.height, this.gl.canvas.width / this.gl.canvas.height)
+          },
+          uMouse: { value: new Float32Array([this.mousePos.x, this.mousePos.y]) },
+          uAmplitude: { value: this.amplitude },
+          uSpeed: { value: this.speed }
+        }
+      });
+
+      this.mesh = new Mesh(this.gl, { geometry: this.geometry, program: this.program });
+      this.ctn.appendChild(this.gl.canvas);
+
+      this.resize();
+      this.resizeHandler = () => this.resize();
+      window.addEventListener('resize', this.resizeHandler, false);
+
+      if (this.mouseReact) {
+        this.mouseMoveHandler = (e) => this.handleMouseMove(e);
+        window.addEventListener('mousemove', this.mouseMoveHandler);
       }
-    });
 
-    this.mesh = new Mesh(this.gl, { geometry: this.geometry, program: this.program });
-    this.ctn.appendChild(this.gl.canvas);
-
-    this.resize();
-    this.resizeHandler = () => this.resize();
-    window.addEventListener('resize', this.resizeHandler, false);
-
-    if (this.mouseReact) {
-      this.mouseMoveHandler = (e) => this.handleMouseMove(e);
-      window.addEventListener('mousemove', this.mouseMoveHandler);
+      this.animate();
+    } catch (e) {
+      console.error('Iridescence init failed:', e);
+      // Fallback: simple CSS gradient or just transparent background
+      if (this.ctn) {
+        this.ctn.style.background = 'linear-gradient(45deg, #03050a, #0e2a5c)';
+      }
     }
-
-    this.animate();
   }
 
   resize() {
