@@ -85,7 +85,7 @@
                         </div>
                     </div>
 
-                    <div class="playback-buttons">
+                    <div class="playback-controls">
                         <button id="backBtn" class="control-btn" title="Previous">
                             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
                                 <polygon points="19 20 9 12 19 4 19 20"></polygon>
@@ -109,6 +109,13 @@
                                 <line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"></line>
                             </svg>
                         </button>
+                    </div>
+
+                    <div class="volume-container">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="volume-icon">
+                            <path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 0 1 0 7.07" />
+                        </svg>
+                        <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="100">
                     </div>
                 </div>
 

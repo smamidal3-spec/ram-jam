@@ -37,6 +37,7 @@ const playBtn = document.getElementById('playBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const skipBtn = document.getElementById('skipBtn');
 const backBtn = document.getElementById('backBtn');
+const volumeSlider = document.getElementById('volumeSlider');
 const seekBar = document.getElementById('seekBar');
 const currentTimeDisplay = document.getElementById('currentTimeDisplay');
 const durationDisplay = document.getElementById('durationDisplay');
@@ -92,13 +93,7 @@ function initGSAPBackground() {
         });
     });
     
-    // Global subtle drift
-    gsap.to(".background-animation", {
-        rotation: 360,
-        duration: 100,
-        repeat: -1,
-        ease: "none"
-    });
+    // Removed global rotation drift to prevent circular motion
 }
 
 themeDots.forEach(dot => {
@@ -452,6 +447,7 @@ function onPlayerStateChange(event) {
     if (event.data === YT.PlayerState.PLAYING) {
         playBtn.style.display = 'none';
         pauseBtn.style.display = 'flex';
+        initVolume();
         emitControlEvent('PLAY');
         return;
     }
@@ -668,7 +664,9 @@ socket.on('CONTROL_EVENT', (data) => {
         });
 
         suppressStateEvents(1500);
-        player.loadVideoById(currentVideoId, 0);
+        if (isPlayerReady && player) {
+            player.setVolume(localStorage.getItem('ramjam_volume') || 100);
+        }
         player.playVideo();
         updateMediaSession(currentTrackMeta?.title, currentTrackMeta?.thumbnail);
 
@@ -1172,3 +1170,22 @@ function startSilentKeepalive() {
         // no-op
     }
 }
+
+volumeSlider.addEventListener('input', (e) => {
+    const vol = e.target.value;
+    if (isPlayerReady && player) {
+        player.setVolume(vol);
+        localStorage.setItem('ramjam_volume', vol);
+    }
+});
+
+function initVolume() {
+    const savedVol = localStorage.getItem('ramjam_volume') || 100;
+    volumeSlider.value = savedVol;
+    if (isPlayerReady && player) {
+        player.setVolume(savedVol);
+    }
+}
+
+// Initial call
+initVolume();

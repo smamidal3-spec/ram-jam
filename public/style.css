@@ -431,6 +431,57 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.volume-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 2rem;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-radius: 20px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+  border: 1px solid var(--border);
+  transition: var(--transition);
+}
+
+.volume-container:hover {
+  background: var(--surface-2);
+  border-color: var(--text-dim);
+}
+
+.volume-icon {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.volume-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100px;
+  height: 4px;
+  background: var(--surface-3);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--text);
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--accent-glow);
+  transition: var(--transition);
+}
+
+.volume-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
 .playback-buttons {
   display: flex;
   justify-content: center;
