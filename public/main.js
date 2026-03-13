@@ -390,6 +390,11 @@ function onPlayerReady() {
         const userName = getOrCreateUserName();
         socket.emit('JOIN_SESSION', { sessionId, userName });
     }
+
+    // New: If a video was already identified during join, cue it now that player is ready
+    if (currentVideoId) {
+        player.cueVideoById(currentVideoId, 0);
+    }
 }
 
 function onPlayerStateChange(event) {
@@ -427,6 +432,9 @@ playBtn.addEventListener('click', () => {
     if (!isPlayerReady || !currentVideoId) {
         return;
     }
+    // Immediate UI feedback
+    playBtn.style.display = 'none';
+    pauseBtn.style.display = 'flex';
     player.playVideo();
 });
 
@@ -434,6 +442,9 @@ pauseBtn.addEventListener('click', () => {
     if (!isPlayerReady || !currentVideoId) {
         return;
     }
+    // Immediate UI feedback
+    playBtn.style.display = 'flex';
+    pauseBtn.style.display = 'none';
     player.pauseVideo();
 });
 
@@ -523,6 +534,10 @@ socket.on('JOIN_SUCCESS', (data) => {
         }
         if (currentVideoId) {
             updateAlbumArt(currentVideoId, currentTrackMeta);
+            // Crucial: Cue the video so it's ready to play when clicking the play button
+            if (isPlayerReady) {
+                player.cueVideoById(currentVideoId, 0);
+            }
         }
     }
 
