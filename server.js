@@ -32,14 +32,28 @@ const io = new Server(server, {
 
 const ALLOWED_CONTROL_TYPES = new Set(['PLAY', 'PAUSE', 'SEEK', 'VIDEO_CHANGE']);
 
-app.use(express.static(path.join(__dirname, 'public'), {
-    index: false,
-    setHeaders: (res) => {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
+app.get('/session/:id', (req, res) => {
+    const sessionId = normalizeSessionId(req.params.id);
+    if (!sessionId) {
+        res.status(400).send('Invalid session id');
+        return;
     }
+
+    if (sessionId !== req.params.id) {
+        res.redirect(`/session/${sessionId}`);
+        return;
+    }
+
+    // Force no-cache ONLY on index.html to ensure users get latest app updates
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: '1d', // Cache static assets for 1 day
+    etag: true
 }));
+
 app.use(express.json());
 
 const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || '';
@@ -355,21 +369,6 @@ function getSessionIdFromReferer(referer) {
 app.get('/', (_req, res) => {
     const sessionId = generateUniqueSessionId();
     res.redirect(`/session/${sessionId}`);
-});
-
-app.get('/session/:id', (req, res) => {
-    const sessionId = normalizeSessionId(req.params.id);
-    if (!sessionId) {
-        res.status(400).send('Invalid session id');
-        return;
-    }
-
-    if (sessionId !== req.params.id) {
-        res.redirect(`/session/${sessionId}`);
-        return;
-    }
-
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.get('/api/search', async (req, res) => {
