@@ -502,8 +502,8 @@ app.get('/api/search', async (req, res) => {
     }
 
     try {
-        const videos = await youtubeSearch(query, 8);
-        res.json(videos.map(v => ({ ...v, source: 'youtube' })));
+        const results = await youtubeSearch(query, 10);
+        res.json(results);
     } catch (err) {
         console.error('YouTube search error:', err);
         res.json([]);
