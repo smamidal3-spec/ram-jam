@@ -453,6 +453,11 @@ body {
 }
 
 /* ── Search ──────────────────────────────────────── */
+.search-section {
+  position: relative;
+  z-index: 10;
+}
+
 .search-wrapper {
   position: relative;
 }

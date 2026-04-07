@@ -80,7 +80,18 @@ function saveCacheToFile() {
     }
 }
 
-app.get('/', (_req, res) => {
+// Health check endpoint for Render.com
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
+app.get('/', (req, res) => {
+    // If it's a health check (standard Render user agent), return 200 instead of redirecting
+    const userAgent = req.headers['user-agent'] || '';
+    if (userAgent.includes('Render/')) {
+        res.status(200).send('OK');
+        return;
+    }
     const sessionId = generateUniqueSessionId();
     res.redirect(`/session/${sessionId}`);
 });
