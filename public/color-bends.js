@@ -1,4 +1,4 @@
-import * as THREE from 'https://cdn.skypack.dev/three@0.150.1';
+import * as THREE from 'https://unpkg.com/three@0.150.1/build/three.module.js';
 
 const MAX_COLORS = 8;
 
@@ -119,7 +119,7 @@ export class ColorBends {
     this.material = null;
     this.resizeObserver = null;
     this.clock = new THREE.Clock();
-    
+
     this.pointerTarget = new THREE.Vector2(0, 0);
     this.pointerCurrent = new THREE.Vector2(0, 0);
     this.pointerSmooth = 8;
@@ -139,10 +139,10 @@ export class ColorBends {
   init() {
     const geometry = new THREE.PlaneGeometry(2, 2);
     const uColorsArray = Array.from({ length: MAX_COLORS }, () => new THREE.Vector3(0, 0, 0));
-    
+
     const colorsArr = (this.options.colors || []).filter(Boolean).slice(0, MAX_COLORS).map(c => this.toVec3(c));
     for (let i = 0; i < MAX_COLORS; i++) {
-        if (i < colorsArr.length) uColorsArray[i].copy(colorsArr[i]);
+      if (i < colorsArr.length) uColorsArray[i].copy(colorsArr[i]);
     }
 
     this.material = new THREE.ShaderMaterial({
@@ -216,7 +216,7 @@ export class ColorBends {
     this.raf = requestAnimationFrame(() => this.animate());
     const dt = this.clock.getDelta();
     const elapsed = this.clock.elapsedTime;
-    
+
     this.material.uniforms.uTime.value = elapsed;
 
     const deg = (this.options.rotation % 360) + this.options.autoRotate * elapsed;
@@ -228,7 +228,7 @@ export class ColorBends {
     const amt = Math.min(1, dt * this.pointerSmooth);
     this.pointerCurrent.lerp(this.pointerTarget, amt);
     this.material.uniforms.uPointer.value.copy(this.pointerCurrent);
-    
+
     this.renderer.render(this.scene, this.camera);
   }
 

@@ -1,4 +1,4 @@
-import { Renderer, Program, Mesh, Color, Triangle } from 'https://cdn.skypack.dev/ogl';
+import { Renderer, Program, Mesh, Color, Triangle } from 'https://unpkg.com/ogl';
 
 const vertexShader = `
 attribute vec2 uv;
@@ -51,7 +51,7 @@ export class Iridescence {
     this.amplitude = options.amplitude || 0.1;
     this.mouseReact = options.mouseReact !== undefined ? options.mouseReact : true;
     this.mousePos = { x: 0.5, y: 0.5 };
-    
+
     this.init();
   }
 

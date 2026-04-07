@@ -232,9 +232,7 @@ function applySyncSnapshot(data) {
         return;
     }
 
-    const issuedAt = Number.isFinite(data.issuedAt) ? data.issuedAt : Date.now();
-    const latency = Math.max(0, (Date.now() - issuedAt) / 1000);
-    const expectedTime = Math.max(0, (Number.isFinite(data.time) ? data.time : 0) + latency);
+    const expectedTime = Math.max(0, Number.isFinite(data.time) ? data.time : 0);
     const state = data.state === 'PAUSE' ? 'PAUSE' : 'PLAY';
 
     if (currentVideoId !== data.videoId) {
@@ -338,18 +336,21 @@ function waitForPlayerReady(timeoutMs = PLAYER_READY_WAIT_MS) {
 }
 
 function getOrCreateUserName() {
+    let entered = joinNameInput.value.trim();
+    if (entered) {
+        entered = entered.slice(0, 20);
+        localStorage.setItem('ramjam_username', entered);
+        return entered;
+    }
+
     const existing = localStorage.getItem('ramjam_username');
     if (existing && existing.trim()) {
         return existing.trim().slice(0, 20);
     }
 
-    let entered = joinNameInput.value.trim();
-    if (!entered) {
-        entered = `User-${Math.floor(Math.random() * 1000)}`;
-    }
-    entered = entered.slice(0, 20);
-    localStorage.setItem('ramjam_username', entered);
-    return entered;
+    const generated = `User-${Math.floor(Math.random() * 1000)}`;
+    localStorage.setItem('ramjam_username', generated);
+    return generated;
 }
 
 function setJoinPendingUI(pending) {
@@ -618,9 +619,7 @@ socket.on('CONTROL_EVENT', (data) => {
         return;
     }
 
-    const issuedAt = Number.isFinite(data.issuedAt) ? data.issuedAt : Date.now();
-    const latency = Math.max(0, (Date.now() - issuedAt) / 1000);
-    const expectedTime = Math.max(0, (Number.isFinite(data.time) ? data.time : 0) + latency);
+    const expectedTime = Math.max(0, Number.isFinite(data.time) ? data.time : 0);
 
     if (data.type === 'VIDEO_CHANGE') {
         if (!data.videoId) {
@@ -1127,7 +1126,7 @@ document.addEventListener('visibilitychange', () => {
         }
         // Force silent audio back on
         if (silentAudio && silentAudio.paused && hasJoined) {
-            silentAudio.play().catch(() => {});
+            silentAudio.play().catch(() => { });
         }
     }
 });
@@ -1136,7 +1135,7 @@ let silentAudio = null;
 function startSilentKeepalive() {
     try {
         if (silentAudio) return;
-        
+
         silentAudio = new Audio();
         // 1-second silent WAV, better for mobile OS recognition
         silentAudio.src = 'data:audio/wav;base64,UklGRjIAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhIAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHEAZGEA';
@@ -1148,12 +1147,12 @@ function startSilentKeepalive() {
             silentAudio.play()
                 .then(() => console.log('Silent keepalive started'))
                 .catch(() => { });
-            
+
             // Also try to "prime" the player if it was waiting
             if (isPlayerReady && currentVideoId && player.getPlayerState() === YT.PlayerState.UNSTARTED) {
                 player.playVideo();
             }
-            
+
             activators.forEach(type => document.removeEventListener(type, forcePlay));
         };
 
@@ -1165,12 +1164,12 @@ function startSilentKeepalive() {
         // Heavy-duty background interval
         setInterval(() => {
             if (!hasJoined) return;
-            
+
             // Poke silent audio
             if (silentAudio.paused) {
-                silentAudio.play().catch(() => {});
+                silentAudio.play().catch(() => { });
             }
-            
+
             // Poke YouTube player if it stalled in background
             if (isPlayerReady && currentVideoId) {
                 const state = player.getPlayerState();
@@ -1180,7 +1179,7 @@ function startSilentKeepalive() {
                         try {
                             // Gentle poke - don't reload, just play
                             player.playVideo();
-                        } catch {}
+                        } catch { }
                     }
                 }
             }
