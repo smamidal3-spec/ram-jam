@@ -95,6 +95,19 @@ function isStateEventSuppressed() {
     return Date.now() < suppressStateEventsUntil;
 }
 
+// After a deliberate local action (button press, seek), ignore the host's
+// periodic sync snapshots briefly so in-flight "still playing" snapshots
+// don't override what the user just did. Direct CONTROL_EVENTs still apply.
+let localActionUntil = 0;
+
+function markLocalAction(ms = 2500) {
+    localActionUntil = Date.now() + ms;
+}
+
+function isWithinLocalActionWindow() {
+    return Date.now() < localActionUntil;
+}
+
 function getPlayerTime() {
     if (!player || !isPlayerReady) {
         return 0;
@@ -232,6 +245,10 @@ function applySyncSnapshot(data) {
         return;
     }
 
+    if (isWithinLocalActionWindow()) {
+        return;
+    }
+
     const expectedTime = Math.max(0, Number.isFinite(data.time) ? data.time : 0);
     const state = data.state === 'PAUSE' ? 'PAUSE' : 'PLAY';
 
@@ -265,7 +282,13 @@ function applySyncSnapshot(data) {
     }
 
     if (playerState !== YT.PlayerState.PLAYING) {
-        forceListenerPlayback(expectedTime, 'PLAY');
+        // Gentle resume: a full loadVideoById() here re-buffers the stream and
+        // causes visible jank; seek + play is enough when the video matches.
+        suppressStateEvents(1200);
+        player.seekTo(expectedTime, true);
+        player.playVideo();
+        updateVinylAnimation(true);
+        schedulePlaybackHealthCheck(expectedTime);
         return;
     }
 
@@ -426,6 +449,7 @@ function onPlayerStateChange(event) {
         playBtn.style.display = 'none';
         pauseBtn.style.display = 'flex';
         updateVinylAnimation(true);
+        markLocalAction();
         emitControlEvent('PLAY');
         return;
     }
@@ -434,6 +458,7 @@ function onPlayerStateChange(event) {
         playBtn.style.display = 'flex';
         pauseBtn.style.display = 'none';
         updateVinylAnimation(false);
+        markLocalAction();
         emitControlEvent('PAUSE');
         return;
     }
@@ -457,7 +482,13 @@ playBtn.addEventListener('click', () => {
     // Immediate UI feedback
     playBtn.style.display = 'none';
     pauseBtn.style.display = 'flex';
+    // Emit directly: the state-change echo may fall inside a suppression
+    // window and silently never reach the other device.
+    markLocalAction();
+    suppressStateEvents(800);
     player.playVideo();
+    updateVinylAnimation(true);
+    emitControlEvent('PLAY');
 });
 
 pauseBtn.addEventListener('click', () => {
@@ -467,7 +498,11 @@ pauseBtn.addEventListener('click', () => {
     // Immediate UI feedback
     playBtn.style.display = 'flex';
     pauseBtn.style.display = 'none';
+    markLocalAction();
+    suppressStateEvents(800);
     player.pauseVideo();
+    updateVinylAnimation(false);
+    emitControlEvent('PAUSE');
 });
 
 skipBtn.addEventListener('click', () => {
@@ -483,6 +518,7 @@ backBtn.addEventListener('click', () => {
     }
     // If we are more than 5 seconds into the song, restart it
     if (getPlayerTime() > 5) {
+        markLocalAction();
         player.seekTo(0, true);
         emitControlEvent('SEEK', { time: 0 });
     } else {
@@ -501,6 +537,7 @@ seekBar.addEventListener('change', (event) => {
     }
 
     const newTime = (event.target.value / 100) * duration;
+    markLocalAction();
     player.seekTo(newTime, true);
     emitControlEvent('SEEK', { time: newTime });
 });

@@ -807,6 +807,15 @@ io.on('connection', (socket) => {
     });
 });
 
+// Keep the process alive if a stray async error slips through, instead of
+// crashing the whole room. Log loudly so real bugs are still visible.
+process.on('uncaughtException', (err) => {
+    console.error('[FATAL] Uncaught exception:', err);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[FATAL] Unhandled promise rejection:', reason);
+});
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Ram Jam server running on http://localhost:${PORT}`);
